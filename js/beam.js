@@ -49,12 +49,14 @@ const Beam = (() => {
   const U3 = 0.6; // beam3d.js 와 같은 축척 (화면 단위 / m)
   const KSTEPS = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000];
   const PXSTEPS = [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200];
-  let k3 = null, realScale = false, s2 = null, snapPrev = null, baseline = null, lastAct = 0, lastBanner = '';
+  let k3 = 20, kUser = 20, kCapped = false, s2 = null, snapPrev = null, baseline = null, lastAct = 0, lastBanner = '';
+  const KCHOICES = [1, 5, 20, 100, 500];
+  /* 사용자가 고른 배율을 그대로 쓰고, 화면을 벗어날 만큼 클 때만 한 단계씩 줄인다 */
   function pickK(dmax) {
-    if (realScale) return 1;
     const disp = k => dmax / 1000 * U3 * k;
-    if (k3 && k3 > 1 && disp(k3) <= 1.5 && disp(k3) >= 0.15) return k3;
-    let k = 1; for (const c of KSTEPS) if (disp(c) <= 1.1) k = c;
+    let k = kUser;
+    while (k > 1 && disp(k) > 1.2) k = KSTEPS[Math.max(0, KSTEPS.indexOf(k) - 1)] ?? 1;
+    kCapped = k < kUser;
     return k;
   }
   function pickS2(dmax) {
@@ -915,18 +917,27 @@ const Beam = (() => {
     const p = Math.round(f * 100);
     e.textContent = f < 1 ? `하중 ${p}% → 반력·응력·처짐도 ${p}% (선형 탄성)` : '';
   }
+  /* 참고용 사용성 기준: 일반 보 L/360, 캔틸레버 L/180 (캔틸레버는 길이 기준이 2배로 완화) */
+  function limitNote(da) {
+    const cant = st.support === 'cantilever', lim = cant ? 180 : 360, ratio = st.L * 1000 / da;
+    const ok = ratio >= lim;
+    return `<div class="vi-row ${ok ? 'vi-ok' : 'vi-warn'}">${ok ? '✓' : '!'} 참고 기준 L/${lim}${cant ? '(캔틸레버)' : ''} = ${fmt(st.L * 1000 / lim, 1)} mm ${ok ? '이내 → 일상적으로 쓰는 보의 처짐 범위입니다' : '초과 → 실제 설계라면 단면을 키워야 할 만큼 큰 처짐입니다'}</div>`;
+  }
   function renderInfo3D(ex) {
     const el = $('beam-3d-info'); if (!el) return;
     const d = ex.D.v, da = Math.abs(d), ro = rollerShift();
     el.innerHTML = `<div class="vi-main"><span>δ<sub>max</sub></span><b>${fmt(da, 2)} mm ${d < -1e-9 ? '↓' : d > 1e-9 ? '↑' : ''}</b>${da > 1e-9 ? `<em>= L/${Math.round(st.L * 1000 / da).toLocaleString()}</em>` : ''}</div>
-      <div class="vi-row">처짐 표시 <b>×${k3.toLocaleString()}</b> ${realScale ? '(실제 크기)' : '확대'} · 길이·단면은 실제 비율 <button class="vi-btn" data-real type="button">${realScale ? '확대해서 보기' : '실제 크기로 보기'}</button></div>
+      <div class="vi-row vi-scale">처짐 표시 배율 ${KCHOICES.map(c => `<button class="vi-btn${c === kUser ? ' on' : ''}" data-k="${c}" type="button">${c === 1 ? '×1 실제' : '×' + c}</button>`).join('')}
+        <small>길이·단면은 실제 비율, 처짐만 ${k3 === 1 ? '실제 크기' : '×' + k3.toLocaleString() + ' 확대'}${kCapped ? ` (처짐이 커서 ×${kUser}에서 줄임)` : ''}${da > 1e-9 && da / 1000 * U3 * k3 < 0.04 ? ' · 처짐이 작아 거의 안 보입니다. 배율을 키워 보세요' : ''}</small></div>
+      ${da > 1e-9 ? limitNote(da) : ''}
+      ${st.E > 100 && sigmaOf(Math.max(Math.abs(ex.Mmax.v), Math.abs(ex.Mmin.v))) > 275 ? `<div class="vi-row vi-warn">! 휨응력 ${fmt(sigmaOf(Math.max(Math.abs(ex.Mmax.v), Math.abs(ex.Mmin.v))), 0)} MPa가 강재 항복강도 275 MPa(SS275)를 넘습니다. 실제 보는 여기서 소성 변형이 시작되므로, 선형 탄성으로 계산한 이 처짐과 그림은 그대로 성립하지 않습니다.</div>` : ''}
       ${ro !== null && Math.abs(ro) > 1e-6 ? `<div class="vi-row">롤러 수평 이동 <b>${fmt(Math.abs(ro), 3)} mm ${ro > 0 ? '→' : '←'}</b><small>지점이 보 아래에 있어, 보 아래 섬유가 ${ro > 0 ? '늘어난' : '줄어든'} 길이 (h/2)(θ<sub>B</sub> − θ<sub>A</sub>)만큼 움직입니다.</small></div>` : ''}
       <div class="vi-load" id="beam-3d-load"></div>
       ${lastBanner ? `<div class="vi-banner">${lastBanner}</div>` : ''}`;
   }
   function bindView() {
     $('beam-3d').insertAdjacentHTML('afterend', '<div class="v3d-info" id="beam-3d-info"></div>');
-    $('beam-3d-info').addEventListener('click', e => { if (e.target.closest('[data-real]')) { realScale = !realScale; k3 = null; update(false); } });
+    $('beam-3d-info').addEventListener('click', e => { const b = e.target.closest('[data-k]'); if (b) { kUser = +b.dataset.k; update(false); } });
     $('beam-3d-info').addEventListener('pointerdown', e => e.stopPropagation());
     const setView = v => {
       st.view = v;

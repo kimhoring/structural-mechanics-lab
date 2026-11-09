@@ -226,7 +226,7 @@ const Concept = (() => {
     const nodes = [], defl = [];
     for (let i = 0; i <= 100; i++) { const x = L * i / 100; nodes.push(x); defl.push(-w * x * (L ** 3 - 2 * L * x * x + x ** 3) / (24 * EI) * 1000); }
     const model = {
-      L, nodes, defl, Rmax: 25, Mabs: w * L * L / 8, sec: { type: 'H', h: 400, B: 200, tw: 8, tf: 13 }, k: 1000,
+      L, nodes, defl, Rmax: 25, Mabs: w * L * L / 8, sec: { type: 'H', h: 400, B: 200, tw: 8, tf: 13 }, k: 20,
       sups: [{ x: 0, type: 'pin', R: 25, Mr: 0 }, { x: L, type: 'roller', R: 25, Mr: 0 }],
       loads: [{ type: 'dist', x1: 0, x2: L, w1: w, w2: w }],
       deflAt: x => -w * x * (L ** 3 - 2 * L * x * x + x ** 3) / (24 * EI) * 1000,
