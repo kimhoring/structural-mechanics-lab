@@ -212,6 +212,34 @@ const Concept = (() => {
     svgEl('line', { x1: 450, y1: 40, x2: 450, y2: 200, class: 'axis' }, g);
   }
 
-  function init() { hero(); supportsFig(); signFig(); shapeTable(); deflFig(); tcFig(); }
+  /* 홈 화면: 등분포하중 단순보가 하중을 받아 휘는 3D 장면을 반복 재생 */
+  function hero3D() {
+    if (typeof Viewer3D === 'undefined' || !Viewer3D.has()) return;
+    const svg = $('hero-fig');
+    const box = document.createElement('div');
+    box.className = 'v3d hero-3d';
+    box.innerHTML = '<div class="v3d-legend"><span>압축</span><i class="cbar"></i><span>인장</span></div><div class="v3d-hint">단순보 · 등분포하중 · 드래그해서 돌려 보세요</div>';
+    svg.replaceWith(box);
+    const b = Beam3D.make(box);
+    if (!b) return;
+    const L = 10, w = 5, EI = 48585;
+    const nodes = [], defl = [];
+    for (let i = 0; i <= 100; i++) { const x = L * i / 100; nodes.push(x); defl.push(-w * x * (L ** 3 - 2 * L * x * x + x ** 3) / (24 * EI) * 1000); }
+    const model = {
+      L, nodes, defl, Rmax: 25, Mabs: w * L * L / 8, sec: { type: 'H', h: 400, B: 200 },
+      sups: [{ x: 0, type: 'pin', R: 25, Mr: 0 }, { x: L, type: 'roller', R: 25, Mr: 0 }],
+      loads: [{ type: 'dist', x1: 0, x2: L, w1: w, w2: w }],
+      deflAt: x => -w * x * (L ** 3 - 2 * L * x * x + x ** 3) / (24 * EI) * 1000,
+      Mat: x => w * x * (L - x) / 2,
+    };
+    b.update(model, { animate: true });
+    const home = $('page-home');
+    const kick = () => { if (home.classList.contains('active')) { b.start(); } };
+    setInterval(() => { if (home.classList.contains('active') && !document.hidden) { b.play(); } }, 5200);
+    window.addEventListener('hashchange', kick);
+    setTimeout(kick, 0); // 첫 페이지 표시(app.js) 이후에 시작
+  }
+
+  function init() { hero(); hero3D(); supportsFig(); signFig(); shapeTable(); deflFig(); tcFig(); }
   return { init };
 })();

@@ -29,11 +29,21 @@ const Beam = (() => {
     { label: '일단고정·타단롤러 + 등분포하중', support: 'propped', L: 8, loads: [{ type: 'dist', x1: 0, x2: 8, w1: 6, w2: 6 }] },
   ];
 
+  // 단면: I [10⁶ mm⁴], h·B [mm]
+  const SECTIONS = [
+    { name: 'H-200×100×5.5×8', I: 18.4, h: 200, B: 100, type: 'H' },
+    { name: 'H-300×150×6.5×9', I: 72.1, h: 300, B: 150, type: 'H' },
+    { name: 'H-400×200×8×13', I: 237, h: 400, B: 200, type: 'H' },
+    { name: 'H-600×200×11×17', I: 776, h: 600, B: 200, type: 'H' },
+    { name: 'RC 400×600 (직사각형)', I: 7200, h: 600, B: 400, type: 'rect' },
+  ];
   const st = {
-    support: 'simple', L: 10, aPos: 0, bPos: 7.5, E: 205, I: 237,
-    loads: [], tensionSide: true, overlay: true,
+    support: 'simple', L: 10, aPos: 0, bPos: 7.5, E: 205, I: 237, sec: 2,
+    loads: [], tensionSide: true, overlay: true, view: '3d',
   };
-  let uid = 1, res = null, cursorX = null, drag = null;
+  let uid = 1, res = null, cursorX = null, drag = null, sweeping = null, b3d = null;
+  const sec = () => SECTIONS[st.sec];
+  const sigmaOf = M => M * (sec().h / 2) / st.I; // MPa (M kN·m, I 10⁶ mm⁴)
 
   const xp = x => ML + x / st.L * (W - ML - MR);
   const xm = px => (px - ML) / (W - ML - MR) * st.L;
@@ -293,6 +303,38 @@ const Beam = (() => {
     svgEl('g', { class: 'cursor-layer' }, svg);
   }
 
+  /* 단면 따라 그리기: 그래프를 왼쪽부터 드러내는 클립 */
+  function clipGroup(svg, id, H) {
+    const defs = svgEl('defs', {}, svg);
+    const cp = svgEl('clipPath', { id: id + '-clip' }, defs);
+    svgEl('rect', { x: 0, y: -20, width: sweeping ? xp(sweeping.x) : W, height: H + 40, class: 'clip-rect' }, cp);
+    return svgEl('g', { 'clip-path': `url(#${id}-clip)` }, svg);
+  }
+  function setClip(px) {
+    ['beam-svg-sfd', 'beam-svg-bmd', 'beam-svg-defl'].forEach(id => {
+      const r = $(id).querySelector('.clip-rect');
+      if (r) r.setAttribute('width', px);
+    });
+  }
+  function sweep() {
+    if (sweeping || !res || res.error) return;
+    const btn = $('beam-sweep');
+    btn.disabled = true;
+    sweeping = { x: 0, t0: performance.now() };
+    const dur = 5200;
+    const step = now => {
+      const t = Math.min(1, (now - sweeping.t0) / dur);
+      sweeping.x = st.L * t;
+      cursorX = sweeping.x;
+      setClip(xp(sweeping.x));
+      drawCursor();
+      if (t < 1 && $('page-beam').classList.contains('active')) requestAnimationFrame(step);
+      else { sweeping = null; setClip(W); btn.disabled = false; }
+    };
+    setClip(xp(0));
+    requestAnimationFrame(step);
+  }
+
   /* ---------------- 그리기: SFD / BMD ---------------- */
   function renderDiagram(svgId, vals, opt) {
     const svg = $(svgId);
@@ -302,7 +344,7 @@ const Beam = (() => {
     const mx = Math.max(1e-9, ...vals.map(Math.abs));
     const sc = amp / mx;
     const Y = v => y0 - sgn * v * sc;
-    const g = svgEl('g', {}, svg);
+    const g = clipGroup(svg, svgId, H);
 
     svgEl('line', { x1: xp(0) - 10, y1: y0, x2: xp(st.L) + 10, y2: y0, class: 'axis-strong' }, g);
     svgText(g, 14, Y(mx) + 4, '(+)', { class: 'svg-muted', 'font-weight': 700, style: 'fill:var(--pos)' });
@@ -362,7 +404,7 @@ const Beam = (() => {
   function renderDefl(ex) {
     const svg = $('beam-svg-defl');
     clearSvg(svg);
-    const g = svgEl('g', {}, svg);
+    const g = clipGroup(svg, 'beam-svg-defl', 200);
     const y0 = 100, mx = Math.max(1e-12, ...res.defl.map(Math.abs)), sc = 72 / mx;
     const Y = v => y0 - v * sc;
     svgEl('line', { x1: xp(0), y1: y0, x2: xp(st.L), y2: y0, style: 'stroke:var(--zero);stroke-width:2;stroke-dasharray:6 5' }, g);
@@ -393,7 +435,7 @@ const Beam = (() => {
     });
     const vals = $('beam-readout-vals');
     if (cursorX === null || !res || res.error) {
-      vals.innerHTML = `<div class="readout-empty">👆 그래프 위에 마우스(손가락)를 올리면 그 위치의 <b>전단력 V</b>, <b>휨모멘트 M</b>, <b>처짐 δ</b>와 잘린 단면에 작용하는 힘이 보입니다.</div>`;
+      vals.innerHTML = `<div class="readout-empty">아래 그래프 위에 마우스나 손가락을 올리면 그 위치의 <b>전단력 V</b>, <b>휨모멘트 M</b>, <b>처짐 δ</b>, <b>휨응력 σ</b>와 잘린 단면에 작용하는 힘이 보입니다.</div>`;
       drawCut(null);
       return;
     }
@@ -403,7 +445,7 @@ const Beam = (() => {
     for (const id in heights) {
       const layer = $(id).querySelector('.cursor-layer');
       svgEl('line', { x1: X, y1: 6, x2: X, y2: heights[id] - 6, class: 'cursor-line' }, layer);
-      if (id === 'beam-svg-load') svgText(layer, X + 6, 20, '✂ 여기서 자르면?', { 'font-size': 12, style: 'fill:var(--accent)', 'font-weight': 700 });
+      if (id === 'beam-svg-load') svgText(layer, X + 6, 20, '여기서 자르면?', { 'font-size': 12, style: 'fill:var(--accent)', 'font-weight': 700 });
     }
     const dot = (id, y, color) => svgEl('circle', { cx: X, cy: y, r: 5.5, style: `fill:${color};stroke:var(--surface);stroke-width:2` }, $(id).querySelector('.cursor-layer'));
     dot('beam-svg-sfd', maps.sfd.Y(q.V), 'var(--pos)');
@@ -413,7 +455,8 @@ const Beam = (() => {
       <div class="rv"><span>위치 x</span><b>${fmt(x, 2)} m</b></div>
       <div class="rv v"><span>전단력 V</span><b>${fmt(q.V)} kN</b></div>
       <div class="rv m"><span>휨모멘트 M</span><b>${fmt(q.M)} kN·m</b></div>
-      <div class="rv d"><span>처짐 δ</span><b>${fmt(Math.abs(dv), 2)} mm ${Math.abs(dv) < 1e-6 ? '' : dv < 0 ? '↓' : '↑'}</b></div>`;
+      <div class="rv d"><span>처짐 δ</span><b>${fmt(Math.abs(dv), 2)} mm ${Math.abs(dv) < 1e-6 ? '' : dv < 0 ? '↓' : '↑'}</b></div>
+      <div class="rv s"><span>최대 휨응력 σ</span><b>${fmt(Math.abs(sigmaOf(q.M)), 1)} MPa</b></div>`;
     drawCut(q);
   }
 
@@ -455,7 +498,7 @@ const Beam = (() => {
     const sups = res.sups, L = st.L;
     const named = []; let np = 0, nw = 0, nm = 0;
     st.loads.forEach(l => named.push({ l, name: l.type === 'point' ? `P${++np}` : l.type === 'moment' ? `M${++nm}` : `W${++nw}` }));
-    let h = `<h3>📘 풀이 과정</h3>`;
+    let h = `<h3>풀이 과정</h3>`;
 
     // STEP 1 반력
     h += `<div class="step"><h4><span class="step-dot">1</span>반력 구하기 — 보 전체가 가만히 있으려면?</h4>`;
@@ -541,12 +584,17 @@ const Beam = (() => {
     // STEP 4 처짐
     h += `<div class="step"><h4><span class="step-dot">4</span>처짐 — 모멘트가 보를 얼마나 휘게 하나</h4>`;
     h += `<p>M(+) 구간은 아래로 볼록(∪), M(−) 구간은 위로 볼록(∩)하게 휩니다. 휘는 정도(곡률)는 <b>M / EI</b>이고, 이것을 두 번 누적하면 처짐 곡선이 됩니다. 지점에서는 처짐이 0, 고정단에서는 기울기까지 0입니다.</p>`;
+    {
+      const Mabs = Math.max(Math.abs(ex.Mmax.v), Math.abs(ex.Mmin.v)), sg = sigmaOf(Mabs);
+      h += `<p><b>휨응력 검토</b> (${sec().name}, 보 높이 h = ${sec().h} mm → 연단 거리 c = h/2): 3D 모델의 색이 바로 이 응력 분포입니다. 위아래 끝에서 가장 크고 중립축에서 0입니다.</p>`;
+      h += `<div class="eq">σmax = M·c / I = ${fmt(Mabs)}×10⁶ × ${fmt(sec().h / 2)} / (${fmt(st.I)}×10⁶) = <span class="ans">${fmt(sg, 1)} MPa</span>${sec().type === 'H' ? ` → SS275 항복강도 275 MPa 대비 ${fmt(sg / 275 * 100, 0)}%` : ''}</div>`;
+    }
     h += `<div class="eq">EI = ${fmt(st.E)} GPa × ${fmt(st.I)}×10⁶ mm⁴ = ${fmt(res.EI, 0)} kN·m² &nbsp;→&nbsp; <span class="ans">δmax = ${fmt(Math.abs(ex.D.v), 2)} mm ${ex.D.v < 0 ? '(아래)' : '(위)'}</span> (x = ${fmt(ex.D.x)} m)</div>`;
     const lim = st.support === 'cantilever' ? L / 180 : L / 360;
     const ok = Math.abs(ex.D.v) / 1000 <= lim;
     h += `<p>참고: 일반적인 처짐 허용 기준 ${st.support === 'cantilever' ? 'L/180' : 'L/360'} = ${fmt(lim * 1000, 1)} mm → <b style="color:${ok ? 'var(--react)' : 'var(--neg)'}">${ok ? '만족 ✔' : '초과 ✘ (단면을 키워 보세요)'}</b></p>`;
     const chk = formulaCheck(ex);
-    if (chk) h += `<div class="check-box">📐 <b>공식으로 검산</b><br>${chk}</div>`;
+    if (chk) h += `<div class="check-box"><b>공식으로 검산</b><br>${chk}</div>`;
     h += `</div>`;
     return h;
   }
@@ -582,9 +630,9 @@ const Beam = (() => {
     let np = 0, nw = 0, nm = 0;
     box.innerHTML = st.loads.map(l => {
       const num = (k, v, lab, step = 0.1, min = '') => `<label>${lab}<input type="number" data-id="${l.id}" data-k="${k}" value="${+v.toFixed(3)}" step="${step}" ${min !== '' ? `min="${min}"` : ''}></label>`;
-      if (l.type === 'point') return `<div class="load-item"><div class="load-item-head">⬇ 집중하중 P${++np}<button data-del="${l.id}" title="삭제">×</button></div><div class="load-fields">${num('P', l.P, '크기 P (kN)', 1)}${num('x', l.x, '위치 x (m)', 0.1, 0)}</div></div>`;
-      if (l.type === 'moment') return `<div class="load-item moment"><div class="load-item-head">↻ 모멘트 하중 M${++nm}<button data-del="${l.id}" title="삭제">×</button></div><div class="load-fields">${num('M', l.M, '크기 M (kN·m)', 1)}${num('x', l.x, '위치 x (m)', 0.1, 0)}</div></div>`;
-      return `<div class="load-item"><div class="load-item-head">▤ 분포하중 W${++nw}<button data-del="${l.id}" title="삭제">×</button></div><div class="load-fields">${num('w1', l.w1, '시작 w₁ (kN/m)', 0.5, 0)}${num('w2', l.w2, '끝 w₂ (kN/m)', 0.5, 0)}${num('x1', l.x1, '시작 x₁ (m)', 0.1, 0)}${num('x2', l.x2, '끝 x₂ (m)', 0.1, 0)}</div></div>`;
+      if (l.type === 'point') return `<div class="load-item"><div class="load-item-head"><span><i></i>집중하중 P${++np}</span><button data-del="${l.id}" title="삭제">×</button></div><div class="load-fields">${num('P', l.P, '크기 P (kN)', 1)}${num('x', l.x, '위치 x (m)', 0.1, 0)}</div></div>`;
+      if (l.type === 'moment') return `<div class="load-item moment"><div class="load-item-head"><span><i></i>모멘트 하중 M${++nm}</span><button data-del="${l.id}" title="삭제">×</button></div><div class="load-fields">${num('M', l.M, '크기 M (kN·m)', 1)}${num('x', l.x, '위치 x (m)', 0.1, 0)}</div></div>`;
+      return `<div class="load-item"><div class="load-item-head"><span><i></i>분포하중 W${++nw}</span><button data-del="${l.id}" title="삭제">×</button></div><div class="load-fields">${num('w1', l.w1, '시작 w₁ (kN/m)', 0.5, 0)}${num('w2', l.w2, '끝 w₂ (kN/m)', 0.5, 0)}${num('x1', l.x1, '시작 x₁ (m)', 0.1, 0)}${num('x2', l.x2, '끝 x₂ (m)', 0.1, 0)}</div></div>`;
     }).join('');
   }
 
@@ -625,6 +673,9 @@ const Beam = (() => {
     maps.sfd = renderDiagram('beam-svg-sfd', res.V, { color: 'var(--pos)', labels: sfdLabels() });
     maps.bmd = renderDiagram('beam-svg-bmd', res.M, { color: 'var(--neg)', flip: st.tensionSide, labels: bmdLabels(ex) });
     maps.defl = renderDefl(ex);
+    const Mabs = Math.max(Math.abs(ex.Mmax.v), Math.abs(ex.Mmin.v));
+    $('beam-sig').textContent = `σmax = M·c/I = ${fmt(sigmaOf(Mabs), 1)} MPa`;
+    update3D(ex);
     $('beam-reactions').innerHTML = res.sups.map(s => `<span class="chip">R${s.name} = ${fmt(s.R)} kN ${s.R >= 0 ? '↑' : '↓'}</span>` + (s.type === 'fixed' ? `<span class="chip">M${s.name} = ${fmt(Math.abs(s.Mr))} kN·m ${s.Mr >= 0 ? '↺' : '↻'}</span>` : '')).join('')
       + (SUPPORT_INFO[st.support].det ? '' : `<span class="chip warn">부정정 구조물</span>`);
     if (full) renderLoadList();
@@ -717,7 +768,7 @@ const Beam = (() => {
     $('beam-a').addEventListener('input', e => { st.aPos = +e.target.value; update(false); });
     $('beam-b').addEventListener('input', e => { st.bPos = +e.target.value; update(false); });
     $('beam-E').addEventListener('change', e => { st.E = +e.target.value; update(false); });
-    $('beam-I').addEventListener('change', e => { st.I = +e.target.value; update(false); });
+    $('beam-I').addEventListener('change', e => { st.sec = +e.target.value; st.I = sec().I; if (sec().type === 'rect') { st.E = 25; $('beam-E').value = '25'; } update(false); });
     $('beam-tension').addEventListener('change', e => { st.tensionSide = e.target.checked; update(false); });
     $('beam-overlay').addEventListener('change', e => { st.overlay = e.target.checked; update(false); });
     document.querySelectorAll('[data-add]').forEach(b => b.addEventListener('click', () => addLoad(b.dataset.add)));
@@ -740,7 +791,9 @@ const Beam = (() => {
     $('beam-tension').checked = st.tensionSide;
     $('beam-overlay').checked = st.overlay;
     $('beam-E').value = String(st.E);
-    $('beam-I').value = String(st.I);
+    $('beam-I').innerHTML = SECTIONS.map((x, i) => `<option value="${i}">${x.name} · I = ${x.I}×10⁶ mm⁴</option>`).join('');
+    $('beam-I').value = String(st.sec);
+    bindView();
     bindPointer();
 
     // 시작 상태
@@ -751,5 +804,34 @@ const Beam = (() => {
     update();
   }
 
-  return { init, refresh: () => update(false) };
+  /* ---------------- 3D 보기 ---------------- */
+  function update3D(ex, animate = false) {
+    if (st.view !== '3d' || !res || res.error) return;
+    if (!b3d) { b3d = Beam3D.make($('beam-3d')); animate = true; if (!b3d) return; }
+    const Rmax = Math.max(1e-9, ...res.sups.map(s => Math.abs(s.R)));
+    b3d.update({
+      L: st.L, sups: res.sups, loads: st.loads, nodes: res.nodes, defl: res.defl,
+      deflAt, Mat: x => VMat(x).M, Mabs: Math.max(Math.abs(ex.Mmax.v), Math.abs(ex.Mmin.v)), Rmax,
+      sec: { type: sec().type, h: sec().h, B: sec().B },
+    }, { animate });
+    b3d.start();
+  }
+  function bindView() {
+    const setView = v => {
+      st.view = v;
+      document.querySelectorAll('#beam-view button').forEach(b => b.classList.toggle('active', b.dataset.v === v));
+      $('beam-3d').toggleAttribute('hidden', v !== '3d');
+      $('beam-svg-load').toggleAttribute('hidden', v !== '2d');
+      if (v === '3d' && res && !res.error) update3D(extremes());
+    };
+    document.querySelectorAll('#beam-view button').forEach(b => b.addEventListener('click', () => setView(b.dataset.v)));
+    $('beam-play3d').addEventListener('click', () => {
+      if (st.view !== '3d') setView('3d');
+      if (b3d) b3d.play();
+    });
+    $('beam-sweep').addEventListener('click', sweep);
+    if (!Viewer3D.has()) setView('2d');
+  }
+
+  return { init, refresh: () => { update(false); if (st.view === '3d' && b3d) b3d.start(); } };
 })();

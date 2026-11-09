@@ -2,310 +2,369 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>구조역학 시각화 랩</title>
-<meta name="description" content="SFD·BMD·처짐, 트러스 절점법·절단법을 눈으로 보며 이해하는 구조역학 학습 웹앱">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="SFD·BMD·처짐, 단면 응력, 트러스, 기둥 좌굴을 3D와 애니메이션으로 공부하는 구조역학 학습 앱">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-<header class="topbar">
-  <a class="brand" href="#home"><span class="brand-mark">⟂</span> 구조역학 시각화 랩</a>
-  <nav class="nav" id="nav">
-    <a href="#home" data-page="home">홈</a>
-    <a href="#concept" data-page="concept">기초 개념</a>
-    <a href="#beam" data-page="beam">보 해석 <small>SFD·BMD·처짐</small></a>
-    <a href="#truss" data-page="truss">트러스 <small>절점법·절단법</small></a>
-  </nav>
-  <button class="theme-btn" id="theme-btn" title="다크/라이트 전환">◐</button>
-</header>
+<div class="app">
+  <!-- ============ 사이드바 ============ -->
+  <aside class="rail" id="rail" aria-label="학습 메뉴">
+    <a class="brand" href="#home">
+      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M3 22h26M6 22l5-12 5 12 5-12 5 12M11 10h10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/></svg>
+      <span>구조역학 랩</span>
+    </a>
+    <nav class="nav" id="nav">
+      <div class="nav-group">시작</div>
+      <a href="#home" data-page="home"><svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"/></svg><span>학습 홈</span></a>
+      <div class="nav-group">이론</div>
+      <a href="#basics" data-page="basics"><svg viewBox="0 0 24 24"><path d="M5 4h11l3 3v13H5zM9 10h6M9 14h6"/></svg><span>기초 개념</span><i class="done-dot"></i></a>
+      <div class="nav-group">실습 랩</div>
+      <a href="#beam" data-page="beam"><svg viewBox="0 0 24 24"><path d="M3 9h18v4H3zM6 13l-2 5h4zM18 13l-2 5h4zM12 3v5"/></svg><span>보 해석</span><small>SFD·BMD·처짐</small><i class="done-dot"></i></a>
+      <a href="#section" data-page="section"><svg viewBox="0 0 24 24"><path d="M5 4h14v3h-5.5v10H19v3H5v-3h5.5V7H5z"/></svg><span>단면과 응력</span><small>I·σ·τ</small><i class="done-dot"></i></a>
+      <a href="#truss" data-page="truss"><svg viewBox="0 0 24 24"><path d="M3 18h18M3 18l4.5-9 4.5 9 4.5-9 4.5 9M7.5 9h9"/></svg><span>트러스</span><small>절점법·절단법</small><i class="done-dot"></i></a>
+      <a href="#column" data-page="column"><svg viewBox="0 0 24 24"><path d="M12 3v2M9 5h6M12 5c3 5 3 9 0 14M9 19h6M12 19v2"/></svg><span>기둥 좌굴</span><small>오일러</small><i class="done-dot"></i></a>
+      <div class="nav-group">확인</div>
+      <a href="#practice" data-page="practice"><svg viewBox="0 0 24 24"><path d="M5 12l4 4 10-10M4 20h16"/></svg><span>연습문제</span><i class="done-dot"></i></a>
+    </nav>
+    <div class="rail-foot">
+      <div class="progress-mini"><span>학습 진도</span><b id="progress-pct">0%</b></div>
+      <div class="bar"><i id="progress-bar"></i></div>
+      <button class="theme-btn" id="theme-btn" type="button"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9z"/></svg><span>테마 전환</span></button>
+    </div>
+  </aside>
+  <div class="scrim" id="scrim"></div>
 
-<main>
+  <div class="main">
+    <header class="topbar">
+      <button class="menu-btn" id="menu-btn" type="button" aria-label="메뉴 열기"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+      <div class="titles">
+        <h1 id="page-title">학습 홈</h1>
+        <p id="page-sub"></p>
+      </div>
+      <div class="top-actions" id="top-actions"></div>
+    </header>
+
+    <main class="content">
 <!-- ================= HOME ================= -->
 <section class="page" id="page-home">
-  <div class="hero">
+  <div class="home-hero">
     <div class="hero-text">
-      <h1>힘이 <em>어디로</em> 흐르는지<br>눈으로 보는 구조역학</h1>
-      <p>보에 하중을 올리고 끌어서 옮겨 보세요. 반력, 전단력도(SFD), 휨모멘트도(BMD), 처짐이 바로 바뀝니다.
-        트러스에서는 부재가 <b class="t-tension">당겨지는지(인장)</b> <b class="t-comp">눌리는지(압축)</b>를 색과 화살표로 보여 줍니다.</p>
+      <p class="eyebrow">대학 구조역학 · 정역학부터 좌굴까지</p>
+      <h2>하중이 보와 트러스를<br>어떻게 지나가는지 봅니다</h2>
+      <p>하중을 끌어 옮기면 반력·전단력도·휨모멘트도·처짐이 즉시 다시 그려집니다. 3D 모델에서는 보가 휘며 응력 색이 바뀌고, 트러스 부재 속으로 힘이 흐릅니다.</p>
       <div class="hero-cta">
-        <a class="btn primary" href="#beam">보 해석 시작하기 →</a>
-        <a class="btn" href="#truss">트러스 실험실</a>
-        <a class="btn ghost" href="#concept">기초 개념부터</a>
+        <a class="btn primary" id="continue-btn" href="#basics">학습 시작하기</a>
+        <a class="btn" href="#beam">보 해석 랩 열기</a>
       </div>
     </div>
     <svg class="hero-fig" id="hero-fig" viewBox="0 0 460 300" aria-hidden="true"></svg>
   </div>
 
-  <div class="cards">
-    <a class="card" href="#concept">
-      <div class="card-num">01</div>
-      <h3>기초 개념</h3>
-      <p>지점과 반력, 전단력·휨모멘트의 부호, 하중 → 전단력 → 모멘트 → 처짐으로 이어지는 관계를 그림으로 정리합니다.</p>
-    </a>
-    <a class="card" href="#beam">
-      <div class="card-num">02</div>
-      <h3>보 해석 (SFD · BMD · 처짐)</h3>
-      <p>단순보·캔틸레버·내민보·고정보에 집중/분포/모멘트 하중을 올리고, 반력 계산부터 처짐까지 풀이 과정을 단계별로 봅니다.</p>
-    </a>
-    <a class="card" href="#truss">
-      <div class="card-num">03</div>
-      <h3>트러스 (절점법 · 절단법)</h3>
-      <p>프랫·하우·워렌·지붕 트러스의 부재력을 색으로 확인하고, 절점법과 절단법의 풀이 순서를 따라가 봅니다.</p>
-    </a>
-  </div>
-
-  <div class="howto">
-    <h2>추천 학습 순서</h2>
-    <ol>
-      <li><b>기초 개념</b>에서 부호 규약(+/−)과 "모멘트는 전단력도의 넓이"라는 관계를 먼저 익힙니다.</li>
-      <li><b>보 해석</b>에서 예제를 하나 고르고 <b>풀이 과정</b>을 읽으며 반력 → SFD → BMD → 처짐 순서로 확인합니다.</li>
-      <li>하중을 <b>드래그</b>해서 옮기며 그래프 모양이 어떻게 바뀌는지 관찰합니다. 그래프 위에 마우스를 올리면 그 위치의 값과 단면의 힘이 보입니다.</li>
-      <li><b>트러스</b>에서 전체 결과를 본 뒤 <b>절점법</b> 단계를 넘기고, <b>절단법</b>에서 자르는 위치를 바꿔 봅니다.</li>
-    </ol>
-  </div>
+  <h3 class="section-title">학습 경로 <small>순서대로 진행하면 한 학기 구조역학의 핵심을 다룹니다</small></h3>
+  <ol class="path" id="path"></ol>
 </section>
 
-<!-- ================= CONCEPT ================= -->
-<section class="page" id="page-concept">
-  <div class="concept-wrap">
-    <h2 class="page-title">기초 개념</h2>
-
-    <article class="concept">
-      <h3>1. 지점(Support)과 반력(Reaction)</h3>
-      <p>보를 받쳐 주는 곳을 <b>지점</b>이라 합니다. 지점은 움직임을 막는 만큼 힘을 되돌려 주는데, 이 힘이 <b>반력</b>입니다. 막는 움직임이 많을수록 반력의 개수가 많습니다.</p>
+<!-- ================= BASICS ================= -->
+<section class="page" id="page-basics">
+  <div class="reading">
+    <nav class="toc" aria-label="목차">
+      <a href="#basics" data-jump="c1">지점과 반력</a><a href="#basics" data-jump="c2">전단력·휨모멘트</a><a href="#basics" data-jump="c3">w·V·M 관계</a><a href="#basics" data-jump="c4">처짐과 EI</a><a href="#basics" data-jump="c5">인장과 압축</a><a href="#basics" data-jump="c6">절점법·절단법</a>
+    </nav>
+    <article class="concept" id="c1">
+      <h3>지점과 반력</h3>
+      <p>보를 받치는 곳을 <b>지점</b>이라 합니다. 지점은 막는 움직임의 수만큼 힘(또는 모멘트)을 되돌려 주는데, 이것이 <b>반력</b>입니다.</p>
       <svg id="fig-supports" class="fig" viewBox="0 0 900 230"></svg>
-      <div class="note">평면 구조물에서 쓸 수 있는 평형방정식은 <b>ΣF<sub>x</sub>=0, ΣF<sub>y</sub>=0, ΣM=0</b> 세 개입니다. 반력이 3개면 이것만으로 풀리고(<b>정정</b>), 3개보다 많으면 처짐 조건까지 써야 합니다(<b>부정정</b>).</div>
+      <div class="note">평면 구조물의 평형방정식은 <b>ΣF<sub>x</sub> = 0, ΣF<sub>y</sub> = 0, ΣM = 0</b> 세 개입니다. 미지 반력이 3개면 <b>정정</b>, 그보다 많으면 <b>부정정</b>입니다. 부정정 차수 = (반력 수) − 3.</div>
     </article>
-
-    <article class="concept">
-      <h3>2. 전단력(V)과 휨모멘트(M)란?</h3>
-      <p>보를 어떤 위치에서 가상으로 <b>잘랐다</b>고 생각해 봅시다. 잘린 두 조각이 각각 제자리에 있으려면 단면에서 서로 힘을 주고받아야 합니다.</p>
+    <article class="concept" id="c2">
+      <h3>전단력(V)과 휨모멘트(M)</h3>
+      <p>보를 어떤 위치에서 가상으로 자르면, 두 조각이 각각 평형을 유지하도록 단면에서 서로 힘을 주고받습니다.</p>
       <ul>
-        <li><b>전단력 V</b>: 단면을 위아래로 <b>엇갈리게 미끄러뜨리려는</b> 힘. 가위질과 비슷합니다.</li>
-        <li><b>휨모멘트 M</b>: 단면을 <b>꺾으려는(휘게 하려는)</b> 회전 효과. 보가 휘는 정도를 결정합니다.</li>
+        <li><b>전단력 V</b>: 단면을 위아래로 엇갈리게 미끄러뜨리려는 힘</li>
+        <li><b>휨모멘트 M</b>: 단면을 꺾으려는 회전 효과. 보가 휘는 정도를 결정합니다</li>
       </ul>
       <svg id="fig-sign" class="fig" viewBox="0 0 900 260"></svg>
-      <div class="note">이 앱의 부호 규약: 단면 <b>왼쪽 부분</b>에 작용하는 <b>위로 향한 힘의 합 = V(+)</b>.
-        보가 <b>아래로 처져 웃는 모양(∪)</b>이 되면 <b>M(+)</b>, 위로 볼록한 찡그린 모양(∩)이면 <b>M(−)</b>입니다. (+)모멘트에서는 보의 <b>아래쪽이 늘어나고(인장)</b> 위쪽이 눌립니다(압축).</div>
+      <div class="note">이 앱의 부호 규약: 단면 <b>왼쪽 부분</b>에 작용하는 위 방향 힘의 합이 <b>V(+)</b>. 보가 아래로 처져 웃는 모양(∪)이 되면 <b>M(+)</b>이고, 이때 아래쪽 섬유가 늘어납니다(인장).</div>
     </article>
-
-    <article class="concept">
-      <h3>3. 하중 → 전단력 → 모멘트 → 처짐: 한 줄로 이어진 관계</h3>
+    <article class="concept" id="c3">
+      <h3>하중 → 전단력 → 모멘트 → 처짐</h3>
       <div class="chain">
-        <div class="chain-box c-load">하중 <b>w</b></div>
-        <div class="chain-op">넓이 누적<br><small>dV/dx = −w</small></div>
-        <div class="chain-box c-v">전단력 <b>V</b></div>
-        <div class="chain-op">넓이 누적<br><small>dM/dx = V</small></div>
-        <div class="chain-box c-m">휨모멘트 <b>M</b></div>
-        <div class="chain-op">÷EI 후 누적<br><small>dθ/dx = M/EI</small></div>
-        <div class="chain-box c-t">처짐각 <b>θ</b></div>
-        <div class="chain-op">누적<br><small>dδ/dx = θ</small></div>
+        <div class="chain-box c-load">하중 <b>w</b></div><div class="chain-op">적분<br><small>dV/dx = −w</small></div>
+        <div class="chain-box c-v">전단력 <b>V</b></div><div class="chain-op">적분<br><small>dM/dx = V</small></div>
+        <div class="chain-box c-m">휨모멘트 <b>M</b></div><div class="chain-op">÷EI, 적분<br><small>dθ/dx = M/EI</small></div>
+        <div class="chain-box c-t">처짐각 <b>θ</b></div><div class="chain-op">적분<br><small>dδ/dx = θ</small></div>
         <div class="chain-box c-d">처짐 <b>δ</b></div>
       </div>
-      <p>오른쪽으로 갈수록 그래프가 <b>한 차수씩 높아지고 부드러워집니다</b>. 그래서 아래 표 하나만 기억해도 SFD·BMD 모양을 대부분 예측할 수 있습니다.</p>
+      <p>오른쪽으로 갈수록 곡선이 한 차수씩 높아집니다. 아래 표로 SFD·BMD 모양을 대부분 예측할 수 있습니다.</p>
       <div class="shape-table" id="shape-table"></div>
-      <div class="note">핵심 세 가지:
-        ① <b>집중하중</b> 위치에서 SFD가 하중 크기만큼 <b>계단처럼 뚝 떨어지고</b>, BMD는 <b>꺾입니다</b>.
-        ② <b>V = 0</b>인 곳에서 M이 <b>최대(또는 최소)</b>가 됩니다.
-        ③ 두 점 사이 <b>SFD의 넓이 = M의 변화량</b>입니다.</div>
+      <div class="note">① 집중하중 위치에서 SFD는 하중 크기만큼 <b>계단식으로 변하고</b> BMD는 <b>꺾입니다</b>. ② <b>V = 0</b>인 곳에서 M이 극값입니다. ③ 두 점 사이 <b>SFD의 넓이 = M의 변화량</b>입니다.</div>
     </article>
-
-    <article class="concept">
-      <h3>4. 처짐(Deflection)</h3>
-      <p>휨모멘트가 크면 보가 많이 휩니다. 같은 모멘트라도 <b>EI</b>(재료의 단단함 E × 단면의 휨 저항 I)가 크면 덜 휩니다. 그래서 같은 재료라도 보를 눕히지 않고 <b>세워서</b> 쓰면(I가 커져서) 훨씬 덜 처집니다.</p>
+    <article class="concept" id="c4">
+      <h3>처짐과 휨강성 EI</h3>
+      <p>같은 모멘트라도 <b>EI</b>(탄성계수 E × 단면2차모멘트 I)가 크면 덜 휩니다. 직사각형의 I = bh³/12 이므로 높이 h를 2배로 하면 처짐은 1/8이 됩니다.</p>
       <svg id="fig-defl" class="fig" viewBox="0 0 900 200"></svg>
     </article>
-
-    <article class="concept">
-      <h3>5. 인장(Tension)과 압축(Compression)</h3>
-      <p>트러스 부재는 양 끝이 핀으로 연결되어 있어서 <b>축방향 힘(당기거나 미는 힘)만</b> 받습니다.</p>
+    <article class="concept" id="c5">
+      <h3>인장과 압축</h3>
+      <p>트러스 부재는 양 끝이 핀으로 연결되어 <b>축방향 힘</b>만 받습니다.</p>
       <svg id="fig-tc" class="fig" viewBox="0 0 900 230"></svg>
-      <div class="note">이 앱에서는 부재 위의 화살표가 <b>부재가 양끝에서 받는 힘</b>을 나타냅니다. <span class="t-tension">← 인장 →</span>은 양쪽에서 당겨져 늘어나는 것, <span class="t-comp">→ 압축 ←</span>은 양쪽에서 밀려 줄어드는 것입니다.
-        계산할 때는 모르는 부재력을 일단 <b>인장(+)</b>이라고 가정하고, 답이 <b>음수(−)</b>로 나오면 <b>압축</b>입니다.</div>
+      <div class="note">미지 부재력은 <b>인장(+)</b>으로 가정하고 풉니다. 답이 음수면 <b>압축</b>입니다. 압축재는 길고 가늘수록 <b>좌굴</b>을 검토해야 합니다.</div>
     </article>
-
-    <article class="concept">
-      <h3>6. 절점법 vs 절단법</h3>
+    <article class="concept" id="c6">
+      <h3>절점법과 절단법</h3>
       <div class="two-col">
-        <div>
-          <h4>절점법 (Method of Joints)</h4>
-          <p>절점(핀) 하나를 동그랗게 떼어 내고, 그 절점에서 <b>ΣF<sub>x</sub>=0, ΣF<sub>y</sub>=0</b>을 씁니다. 식이 2개이므로 <b>미지수가 2개 이하인 절점</b>부터 차례로 풉니다. 모든 부재력을 구할 때 유리합니다.</p>
-        </div>
-        <div>
-          <h4>절단법 (Method of Sections)</h4>
-          <p>트러스를 <b>부재 3개 이하</b>를 지나도록 잘라, 한쪽 덩어리 전체의 평형(ΣF<sub>x</sub>, ΣF<sub>y</sub>, ΣM)을 씁니다. 나머지 두 부재가 만나는 점에 대해 <b>모멘트</b>를 잡으면 미지수 하나만 남습니다. <b>특정 부재 하나</b>의 힘만 빨리 구할 때 유리합니다.</p>
-        </div>
+        <div><h4>절점법</h4><p>절점 하나를 떼어 ΣF<sub>x</sub> = 0, ΣF<sub>y</sub> = 0을 씁니다. 식이 2개이므로 <b>미지수 2개 이하인 절점</b>부터 차례로 풉니다. 모든 부재력을 구할 때 씁니다.</p></div>
+        <div><h4>절단법</h4><p>부재 3개 이하를 지나도록 잘라 한쪽 덩어리의 ΣF<sub>x</sub>, ΣF<sub>y</sub>, ΣM을 씁니다. 나머지 두 부재가 만나는 점에 대해 모멘트를 잡으면 미지수 하나만 남습니다. <b>특정 부재</b>만 구할 때 빠릅니다.</p></div>
       </div>
-      <div class="hero-cta"><a class="btn primary" href="#truss">트러스 실험실에서 해 보기 →</a></div>
+      <div class="truss-check"><b>트러스 정정 판별</b> m + r = 2j 이면 정정 (m: 부재 수, r: 반력 수, j: 절점 수). m + r &gt; 2j 이면 부정정, m + r &lt; 2j 이면 불안정입니다.</div>
     </article>
+    <div class="next-row"><a class="btn primary" href="#beam">다음: 보 해석 랩 →</a></div>
   </div>
 </section>
 
 <!-- ================= BEAM ================= -->
 <section class="page" id="page-beam">
-  <div class="workspace">
-    <aside class="controls">
-      <div class="ctl-group">
-        <h3><span class="step-dot">1</span>보의 종류</h3>
+  <div class="lab">
+    <aside class="lab-controls">
+      <div class="ctl">
+        <h3>보의 종류</h3>
         <div class="seg seg-wrap" id="beam-support">
-          <button data-v="simple">단순보</button>
-          <button data-v="cantilever">캔틸레버</button>
-          <button data-v="overhang">내민보</button>
-          <button data-v="propped">일단고정·타단롤러</button>
-          <button data-v="fixed">양단고정보</button>
+          <button data-v="simple">단순보</button><button data-v="cantilever">캔틸레버</button><button data-v="overhang">내민보</button>
+          <button data-v="propped">고정·롤러</button><button data-v="fixed">양단고정</button>
         </div>
         <p class="hint" id="beam-support-desc"></p>
-        <label class="field">
-          <span>보 길이 L <output id="beam-L-out"></output></span>
-          <input type="range" id="beam-L" min="2" max="20" step="0.5">
-        </label>
+        <label class="field"><span>보 길이 L <output id="beam-L-out"></output></span><input type="range" id="beam-L" min="2" max="20" step="0.5"></label>
         <div id="beam-overhang">
-          <label class="field"><span>지점 A(핀) 위치 <output id="beam-a-out"></output></span><input type="range" id="beam-a" min="0" step="0.25"></label>
-          <label class="field"><span>지점 B(롤러) 위치 <output id="beam-b-out"></output></span><input type="range" id="beam-b" min="0" step="0.25"></label>
+          <label class="field"><span>지점 A (핀) 위치 <output id="beam-a-out"></output></span><input type="range" id="beam-a" min="0" step="0.25"></label>
+          <label class="field"><span>지점 B (롤러) 위치 <output id="beam-b-out"></output></span><input type="range" id="beam-b" min="0" step="0.25"></label>
         </div>
       </div>
-
-      <div class="ctl-group">
-        <h3><span class="step-dot">2</span>하중</h3>
-        <label class="field"><span>예제 불러오기</span>
-          <select id="beam-example"><option value="">— 예제 선택 —</option></select>
-        </label>
+      <div class="ctl">
+        <h3>하중</h3>
+        <label class="field"><span>예제 불러오기</span><select id="beam-example"><option value="">예제를 선택하세요</option></select></label>
         <div class="btn-grid">
-          <button class="btn sm" data-add="point">＋ 집중하중 P</button>
-          <button class="btn sm" data-add="udl">＋ 등분포하중 w</button>
-          <button class="btn sm" data-add="tri">＋ 삼각형 분포</button>
-          <button class="btn sm" data-add="moment">＋ 모멘트 하중</button>
+          <button class="btn sm" data-add="point">+ 집중하중</button><button class="btn sm" data-add="udl">+ 등분포하중</button>
+          <button class="btn sm" data-add="tri">+ 삼각형 분포</button><button class="btn sm" data-add="moment">+ 모멘트 하중</button>
         </div>
         <div id="beam-loads" class="load-list"></div>
-        <p class="hint">P는 아래 방향이 +(위 방향은 −값), 모멘트는 시계방향이 +입니다.</p>
+        <p class="hint">P는 아래 방향이 +, 모멘트는 시계 방향이 +. 그림에서 하중을 끌어 옮길 수 있습니다.</p>
       </div>
-
-      <div class="ctl-group">
-        <h3><span class="step-dot">3</span>재료 · 단면 <small>(처짐 계산용)</small></h3>
-        <label class="field"><span>재료 (탄성계수 E)</span>
-          <select id="beam-E">
-            <option value="205">강재 — E = 205 GPa</option>
-            <option value="25">콘크리트 — E = 25 GPa</option>
-            <option value="10">목재 — E = 10 GPa</option>
-            <option value="70">알루미늄 — E = 70 GPa</option>
-          </select>
-        </label>
-        <label class="field"><span>단면 (단면2차모멘트 I)</span>
-          <select id="beam-I">
-            <option value="18.4">H-200×100 — I = 18.4×10⁶ mm⁴</option>
-            <option value="72.1">H-300×150 — I = 72.1×10⁶ mm⁴</option>
-            <option value="237">H-400×200 — I = 237×10⁶ mm⁴</option>
-            <option value="1130">H-600×200 — I = 1130×10⁶ mm⁴</option>
-            <option value="7200">RC 400×600 — I = 7200×10⁶ mm⁴</option>
-          </select>
-        </label>
+      <div class="ctl">
+        <h3>재료와 단면</h3>
+        <label class="field"><span>재료</span><select id="beam-E">
+          <option value="205">강재 · E = 205 GPa</option><option value="25">콘크리트 · E = 25 GPa</option><option value="10">목재 · E = 10 GPa</option><option value="70">알루미늄 · E = 70 GPa</option>
+        </select></label>
+        <label class="field"><span>단면</span><select id="beam-I"></select></label>
         <p class="hint" id="beam-EI"></p>
       </div>
-
-      <div class="ctl-group">
-        <h3><span class="step-dot">4</span>표시 옵션</h3>
-        <label class="check"><input type="checkbox" id="beam-tension"> BMD를 인장측(아래)에 그리기 <small>(국내 교재 방식)</small></label>
-        <label class="check"><input type="checkbox" id="beam-overlay"> 하중도에 변형 모양 겹쳐 보기</label>
+      <div class="ctl">
+        <h3>표시</h3>
+        <label class="check"><input type="checkbox" id="beam-tension"> BMD를 인장측(아래)에 그리기</label>
+        <label class="check"><input type="checkbox" id="beam-overlay"> 하중도에 변형 형상 겹치기</label>
       </div>
     </aside>
 
-    <div class="stage">
+    <div class="lab-stage">
       <div class="readout" id="beam-readout">
         <div class="readout-vals" id="beam-readout-vals"></div>
         <svg id="beam-cut" viewBox="0 0 340 120" class="cut-fig"></svg>
       </div>
 
-      <div class="dcard">
-        <div class="dcard-head"><h4>① 하중도와 반력</h4><span class="tag">하중을 마우스로 끌어 옮길 수 있어요</span></div>
-        <svg id="beam-svg-load" class="diagram" viewBox="0 0 1000 312"></svg>
+      <section class="panel">
+        <div class="panel-head">
+          <div class="tabs" id="beam-view"><button data-v="3d" class="active">3D 모델</button><button data-v="2d">하중도</button></div>
+          <div class="panel-actions"><button class="btn sm" id="beam-play3d" type="button">하중 재하 ▶</button></div>
+        </div>
+        <div class="v3d" id="beam-3d">
+          <div class="v3d-legend"><span>압축</span><i class="cbar"></i><span>인장</span><b id="beam-sig"></b></div>
+          <div class="v3d-hint">드래그: 회전 · 휠: 확대</div>
+        </div>
+        <svg id="beam-svg-load" class="diagram grid-paper" viewBox="0 0 1000 312" hidden></svg>
         <div class="chips" id="beam-reactions"></div>
-      </div>
-      <div class="dcard">
-        <div class="dcard-head"><h4>② 전단력도 SFD <small>V (kN)</small></h4><span class="legend"><i class="sw pos"></i>(+) <i class="sw neg"></i>(−)</span></div>
-        <svg id="beam-svg-sfd" class="diagram" viewBox="0 0 1000 230"></svg>
-      </div>
-      <div class="dcard">
-        <div class="dcard-head"><h4>③ 휨모멘트도 BMD <small>M (kN·m)</small></h4><span class="legend" id="bmd-legend"></span></div>
-        <svg id="beam-svg-bmd" class="diagram" viewBox="0 0 1000 230"></svg>
-      </div>
-      <div class="dcard">
-        <div class="dcard-head"><h4>④ 처짐 곡선 <small>δ (mm)</small></h4><span class="tag">세로 방향은 과장해서 그렸습니다</span></div>
-        <svg id="beam-svg-defl" class="diagram" viewBox="0 0 1000 200"></svg>
-      </div>
+      </section>
 
-      <div class="dcard steps" id="beam-steps"></div>
+      <section class="panel">
+        <div class="panel-head"><h4>전단력도 SFD <small>V (kN)</small></h4>
+          <div class="panel-actions"><span class="legend"><i class="sw pos"></i>+ <i class="sw neg"></i>−</span><button class="btn sm" id="beam-sweep" type="button">단면 따라 그리기 ▶</button></div></div>
+        <svg id="beam-svg-sfd" class="diagram grid-paper" viewBox="0 0 1000 230"></svg>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h4>휨모멘트도 BMD <small>M (kN·m)</small></h4><span class="legend" id="bmd-legend"></span></div>
+        <svg id="beam-svg-bmd" class="diagram grid-paper" viewBox="0 0 1000 230"></svg>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h4>처짐 곡선 <small>δ (mm)</small></h4><span class="tag">세로 방향 과장</span></div>
+        <svg id="beam-svg-defl" class="diagram grid-paper" viewBox="0 0 1000 200"></svg>
+      </section>
+      <section class="panel steps" id="beam-steps"></section>
+    </div>
+  </div>
+</section>
+
+<!-- ================= SECTION ================= -->
+<section class="page" id="page-section">
+  <div class="lab">
+    <aside class="lab-controls">
+      <div class="ctl">
+        <h3>단면 형상</h3>
+        <div class="seg" id="sec-shape"><button data-v="rect">직사각형</button><button data-v="H">H형강</button><button data-v="T">T형</button><button data-v="circle">원형</button></div>
+        <div id="sec-dims"></div>
+      </div>
+      <div class="ctl">
+        <h3>단면력</h3>
+        <label class="field"><span>휨모멘트 M <output id="sec-M-out"></output></span><input type="range" id="sec-M" min="-300" max="300" step="5"></label>
+        <label class="field"><span>전단력 V <output id="sec-V-out"></output></span><input type="range" id="sec-V" min="0" max="500" step="5"></label>
+        <p class="hint">M &gt; 0 이면 위쪽이 눌리고(압축) 아래쪽이 늘어납니다(인장).</p>
+      </div>
+      <div class="ctl">
+        <h3>단면 성질</h3>
+        <div class="kv-list" id="sec-props"></div>
+      </div>
+    </aside>
+    <div class="lab-stage">
+      <section class="panel">
+        <div class="panel-head"><h4>응력 블록 <small>단면을 잘라 본 휨응력 분포</small></h4><span class="legend"><i class="sw neg"></i>압축 <i class="sw pos"></i>인장</span></div>
+        <svg id="sec-3d" class="diagram" viewBox="0 0 760 440"></svg>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h4>단면 · 휨응력 · 전단응력</h4></div>
+        <svg id="sec-dist" class="diagram grid-paper" viewBox="0 0 760 350"></svg>
+        <div class="hover-out" id="sec-hover"></div>
+      </section>
+      <section class="panel steps">
+        <h3>도심과 단면2차모멘트</h3>
+        <div id="sec-table"></div>
+      </section>
+      <section class="panel steps" id="sec-steps"></section>
     </div>
   </div>
 </section>
 
 <!-- ================= TRUSS ================= -->
 <section class="page" id="page-truss">
-  <div class="workspace">
-    <aside class="controls">
-      <div class="ctl-group">
-        <h3><span class="step-dot">1</span>트러스 형식</h3>
-        <div class="seg seg-wrap" id="truss-type">
-          <button data-v="pratt">프랫</button>
-          <button data-v="howe">하우</button>
-          <button data-v="warren">워렌</button>
-          <button data-v="roof">지붕(삼각)</button>
-        </div>
+  <div class="lab">
+    <aside class="lab-controls">
+      <div class="ctl">
+        <h3>트러스 형식</h3>
+        <div class="seg" id="truss-type"><button data-v="pratt">프랫</button><button data-v="howe">하우</button><button data-v="warren">워렌</button><button data-v="roof">지붕</button></div>
         <p class="hint" id="truss-type-desc"></p>
         <label class="field"><span>패널 수 <output id="truss-n-out"></output></span><input type="range" id="truss-n" min="2" max="8" step="1"></label>
         <label class="field"><span>경간 L <output id="truss-L-out"></output></span><input type="range" id="truss-L" min="4" max="24" step="1"></label>
         <label class="field"><span>높이 h <output id="truss-h-out"></output></span><input type="range" id="truss-h" min="1" max="8" step="0.5"></label>
+        <p class="hint" id="truss-det"></p>
       </div>
-      <div class="ctl-group">
-        <h3><span class="step-dot">2</span>하중</h3>
+      <div class="ctl">
+        <h3>하중</h3>
         <label class="field"><span>절점 하중 P <output id="truss-P-out"></output></span><input type="range" id="truss-P" min="5" max="50" step="5"></label>
         <div class="btn-grid">
-          <button class="btn sm" data-tload="bottom">하현 절점에 재하</button>
-          <button class="btn sm" data-tload="top">상현 절점에 재하</button>
-          <button class="btn sm" data-tload="center">중앙 한 점만</button>
-          <button class="btn sm" data-tload="clear">하중 모두 지우기</button>
+          <button class="btn sm" data-tload="bottom">하현 절점</button><button class="btn sm" data-tload="top">상현 절점</button>
+          <button class="btn sm" data-tload="center">중앙 한 점</button><button class="btn sm" data-tload="clear">모두 지우기</button>
         </div>
-        <p class="hint">그림의 <b>절점(동그라미)을 클릭</b>하면 하중을 놓거나 뺄 수 있습니다.</p>
+        <p class="hint">그림의 절점을 클릭하면 하중을 놓거나 뺍니다.</p>
       </div>
-      <div class="ctl-group">
-        <h3><span class="step-dot">3</span>표시</h3>
-        <label class="check"><input type="checkbox" id="truss-labels" checked> 부재력 값 표시</label>
-        <label class="check"><input type="checkbox" id="truss-arrows" checked> 부재 화살표(인장/압축) 표시</label>
-        <label class="check"><input type="checkbox" id="truss-anim"> 변형 애니메이션 (과장)</label>
+      <div class="ctl">
+        <h3>표시</h3>
+        <label class="check"><input type="checkbox" id="truss-labels" checked> 부재력 값</label>
+        <label class="check"><input type="checkbox" id="truss-arrows" checked> 인장·압축 화살표</label>
+        <label class="check"><input type="checkbox" id="truss-anim"> 변형 애니메이션 (2D)</label>
       </div>
-      <div class="ctl-group legend-box">
-        <div><i class="ln tension"></i><b class="t-tension">인장 (T, +)</b> 당겨져 늘어남 <span class="mini-arrow t-tension">←━━→</span></div>
-        <div><i class="ln comp"></i><b class="t-comp">압축 (C, −)</b> 밀려서 줄어듦 <span class="mini-arrow t-comp">→━━←</span></div>
+      <div class="ctl legend-box">
+        <div><i class="ln tension"></i><b class="t-tension">인장 T (+)</b> 당겨져 늘어남</div>
+        <div><i class="ln comp"></i><b class="t-comp">압축 C (−)</b> 눌려서 줄어듦</div>
         <div><i class="ln zero"></i><b>0부재</b> 힘을 받지 않음</div>
         <div class="muted">선이 굵을수록 부재력이 큽니다.</div>
       </div>
     </aside>
-
-    <div class="stage">
-      <div class="seg mode-tabs" id="truss-mode">
-        <button data-v="result">전체 결과</button>
-        <button data-v="joints">절점법 따라가기</button>
-        <button data-v="sections">절단법 따라가기</button>
+    <div class="lab-stage">
+      <div class="tabs big" id="truss-mode">
+        <button data-v="result">부재력</button><button data-v="3d">3D 교량</button><button data-v="joints">절점법</button><button data-v="sections">절단법</button>
       </div>
-      <div class="dcard">
-        <div class="dcard-head"><h4 id="truss-title">부재력 결과</h4><span class="tag" id="truss-tag"></span></div>
-        <svg id="truss-svg" class="diagram truss" viewBox="0 0 1000 460"></svg>
-        <div class="sec-slider" id="truss-cut-wrap">
-          <label class="field"><span>✂ 절단 위치 <output id="truss-cut-out"></output></span><input type="range" id="truss-cut" min="0" step="1"></label>
+      <section class="panel">
+        <div class="panel-head"><h4 id="truss-title">부재력 결과</h4><span class="tag" id="truss-tag"></span></div>
+        <svg id="truss-svg" class="diagram truss grid-paper" viewBox="0 0 1000 460"></svg>
+        <div class="v3d tall" id="truss-3d" hidden>
+          <div class="v3d-legend"><span>압축</span><i class="cbar"></i><span>인장</span></div>
+          <div class="v3d-hint">움직이는 점 = 힘의 흐름 · 드래그: 회전</div>
+          <div class="v3d-toggles"><label class="check"><input type="checkbox" id="t3d-flow" checked> 힘의 흐름</label><label class="check"><input type="checkbox" id="t3d-deform" checked> 변형</label></div>
         </div>
-      </div>
+        <div class="sec-slider" id="truss-cut-wrap">
+          <label class="field"><span>절단 위치 <output id="truss-cut-out"></output></span><input type="range" id="truss-cut" min="0" step="1"></label>
+        </div>
+      </section>
       <div id="truss-panel"></div>
     </div>
   </div>
 </section>
-</main>
 
-<footer class="foot">구조역학 시각화 랩 · 선형탄성, 미소변형 가정 · 보는 오일러-베르누이 보 이론, 처짐은 강성법(유한요소)으로 계산</footer>
+<!-- ================= COLUMN ================= -->
+<section class="page" id="page-column">
+  <div class="lab">
+    <aside class="lab-controls">
+      <div class="ctl">
+        <h3>지지 조건</h3>
+        <div class="seg seg-wrap" id="col-end"><button data-v="pp">양단 핀</button><button data-v="fp">고정–핀</button><button data-v="ff">양단 고정</button><button data-v="fr">고정–자유</button></div>
+        <p class="hint" id="col-end-note"></p>
+        <label class="field"><span>기둥 길이 L <output id="col-L-out"></output></span><input type="range" id="col-L" min="2" max="12" step="0.5"></label>
+        <label class="field"><span>단면 (SS275)</span><select id="col-sec"></select></label>
+      </div>
+      <div class="ctl">
+        <h3>축하중</h3>
+        <label class="field"><span><span>P / P<sub>cr</sub></span> <output id="col-P-out"></output></span><input type="range" id="col-P" min="0" max="110" step="1"></label>
+        <button class="btn primary wide" id="col-play" type="button">하중 서서히 증가 ▶</button>
+      </div>
+      <div class="ctl"><h3>결과</h3><div class="kv-list" id="col-results"></div></div>
+    </aside>
+    <div class="lab-stage">
+      <section class="panel">
+        <div class="panel-head"><h4>좌굴 형상</h4><span class="tag">횡변위는 과장해서 그렸습니다</span></div>
+        <svg id="col-svg" class="diagram grid-paper" viewBox="0 0 760 470"></svg>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h4>지지 조건별 좌굴 모드 <small>클릭해서 선택</small></h4></div>
+        <svg id="col-modes" class="diagram" viewBox="0 0 760 240"></svg>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><h4>세장비와 좌굴응력</h4></div>
+        <svg id="col-curve" class="diagram grid-paper" viewBox="0 0 760 290"></svg>
+      </section>
+      <section class="panel steps" id="col-steps"></section>
+    </div>
+  </div>
+</section>
 
+<!-- ================= PRACTICE ================= -->
+<section class="page" id="page-practice">
+  <div class="practice">
+    <div class="practice-top">
+      <div class="seg" id="quiz-topics"></div>
+      <div class="score" id="quiz-score"></div>
+      <button class="btn sm ghost" id="quiz-reset" type="button">기록 초기화</button>
+    </div>
+    <section class="panel q-card" id="quiz-card"></section>
+    <p class="hint">숫자는 문제마다 새로 바뀝니다. 답은 ±1% 이내면 정답으로 인정합니다.</p>
+  </div>
+</section>
+    </main>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="js/common.js"></script>
+<script src="js/viewer3d.js"></script>
+<script src="js/beam3d.js"></script>
+<script src="js/truss3d.js"></script>
 <script src="js/concept.js"></script>
 <script src="js/beam.js"></script>
+<script src="js/section.js"></script>
 <script src="js/truss.js"></script>
+<script src="js/column.js"></script>
+<script src="js/quiz.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

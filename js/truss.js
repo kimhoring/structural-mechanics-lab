@@ -257,15 +257,15 @@ const Truss = (() => {
     const groups = { '상현재 (위쪽 부재)': [], '하현재 (아래쪽 부재)': [], '수직재·사재 (복부재)': [] };
     const gname = { top: '상현재 (위쪽 부재)', bottom: '하현재 (아래쪽 부재)', web: '수직재·사재 (복부재)' };
     M.forEach((mb, k) => groups[gname[memberGroup(mb)]].push(k));
-    let h = `<div class="dcard steps">`;
+    let h = `<div class="panel steps">`;
     if (st.selMember !== null) {
       const mb = M[st.selMember], f = F[st.selMember];
-      h += `<div class="check-box" style="margin:0 0 10px">🔎 <b>부재 ${mb.name}</b> — 길이 ${fmt(mb.len)} m, 부재력 <span class="${kindCls(f)}">${fmt(f)} kN (${kindTxt(f)})</span><br>${
+      h += `<div class="check-box" style="margin:0 0 10px"><b>부재 ${mb.name}</b> — 길이 ${fmt(mb.len)} m, 부재력 <span class="${kindCls(f)}">${fmt(f)} kN (${kindTxt(f)})</span><br>${
         kind(f) === 'T' ? '이 부재는 양끝 절점에 의해 <b>잡아당겨지고</b> 있습니다. 밧줄이나 강봉으로 바꿔도 버틸 수 있는 부재입니다.' :
         kind(f) === 'C' ? '이 부재는 양끝에서 <b>눌리고</b> 있습니다. 길고 가늘면 옆으로 휘어 버리는 <b>좌굴</b>에 주의해야 합니다.' :
         '이 하중 조건에서는 힘을 받지 않는 <b>0부재</b>입니다. 그래도 형태 유지와 다른 하중 조건을 위해 필요합니다.'}</div>`;
     }
-    h += `<h3>📋 부재력 표</h3><div class="tbl-wrap"><table class="tbl"><tr><th>구분</th><th>부재</th><th>부재력 (kN)</th><th>상태</th></tr>`;
+    h += `<h3>부재력 표</h3><div class="tbl-wrap"><table class="tbl"><tr><th>구분</th><th>부재</th><th>부재력 (kN)</th><th>상태</th></tr>`;
     for (const gname in groups) groups[gname].forEach((k, i) => {
       h += `<tr data-mrow="${k}" style="cursor:pointer">${i === 0 ? `<td rowspan="${groups[gname].length}">${gname}</td>` : ''}<td>${M[k].name}</td><td class="${kindCls(F[k])}">${fmt(F[k])}</td><td class="${kindCls(F[k])}">${kindTxt(F[k])}</td></tr>`;
     });
@@ -413,12 +413,12 @@ const Truss = (() => {
 
   function jointsPanel(steps) {
     const total = steps.length;
-    let h = `<div class="dcard"><div class="stepper">
+    let h = `<div class="panel"><div class="stepper">
       <button class="btn sm" data-js="first">⏮ 처음</button>
       <button class="btn sm" data-js="prev" ${st.step === 0 ? 'disabled' : ''}>◀ 이전</button>
       <span class="count">${st.step} / ${total} 단계</span>
       <button class="btn sm primary" data-js="next" ${st.step >= total ? 'disabled' : ''}>다음 ▶</button>
-      ${st.step > 0 ? `<button class="btn sm" data-js="reveal">${st.reveal ? '🙈 답 숨기기' : '💡 답 확인'}</button>` : ''}
+      ${st.step > 0 ? `<button class="btn sm" data-js="reveal">${st.reveal ? '답 숨기기' : '답 확인'}</button>` : ''}
     </div>`;
     if (st.step === 0) {
       const xs = T.nodes.map((n, i) => ({ i, n })).filter(o => loadOf(o.i));
@@ -453,9 +453,9 @@ const Truss = (() => {
           h += `<div class="eq">${Fn(T.members[k])} = <span class="${kindCls(f)}">${fmt(f)} kN</span> → ${f < -1e-6 ? '음수이므로 가정과 반대 → ' : ''}<span class="${kindCls(f)}">${kindTxt(f)}</span></div>`;
         });
         const zeroNote = stp.unknown.some(k => kind(S.F[k]) === 0);
-        if (zeroNote) h += `<p class="hint">💡 0부재 판별법: 하중이 없는 절점에 부재가 3개 있고 그중 2개가 일직선이면, 나머지 1개는 0부재입니다.</p>`;
+        if (zeroNote) h += `<p class="hint">0부재 판별법: 하중이 없는 절점에 부재가 3개 있고 그중 2개가 일직선이면, 나머지 1개는 0부재입니다.</p>`;
       } else {
-        h += `<p>식을 직접 풀어 본 뒤 <b>💡 답 확인</b>을 눌러 보세요.</p>`;
+        h += `<p>식을 직접 풀어 본 뒤 <b>답 확인</b>을 눌러 보세요.</p>`;
       }
       h += `</div></div>`;
     }
@@ -605,7 +605,7 @@ const Truss = (() => {
     // 절단선
     const cx = X(c);
     svgEl('line', { x1: cx, y1: 30, x2: cx, y2: VH - 20, style: 'stroke:var(--accent);stroke-width:2.5;stroke-dasharray:10 6' }, g);
-    svgText(g, cx, 24, '✂ 절단', { 'text-anchor': 'middle', 'font-weight': 800, 'font-size': 14, style: 'fill:var(--accent)' });
+    svgText(g, cx, 24, '절단선', { 'text-anchor': 'middle', 'font-weight': 800, 'font-size': 14, style: 'fill:var(--accent)' });
 
     drawLoads(g, i => isLeft(i));
     drawLoads(g, i => !isLeft(i), fade);
@@ -638,11 +638,11 @@ const Truss = (() => {
   }
 
   function sectionsPanel(A) {
-    let h = `<div class="dcard steps">`;
+    let h = `<div class="panel steps">`;
     h += `<div class="stepper"><button class="btn sm" data-sec="prev">◀ 왼쪽 패널</button><button class="btn sm" data-sec="next">오른쪽 패널 ▶</button>
-      <button class="btn sm ${st.reveal ? '' : 'primary'}" data-js="reveal">${st.reveal ? '🙈 답 숨기기' : '💡 답 확인'}</button></div>`;
+      <button class="btn sm ${st.reveal ? '' : 'primary'}" data-js="reveal">${st.reveal ? '답 숨기기' : '답 확인'}</button></div>`;
     if (A.cut.length > 3) {
-      h += `<p>⚠ 이 위치에서는 잘리는 부재가 <b>${A.cut.length}개</b>라서 식(3개)보다 미지수가 많습니다. 다른 위치를 선택하세요.</p></div>`;
+      h += `<p>이 위치에서는 잘리는 부재가 <b>${A.cut.length}개</b>라서 식(3개)보다 미지수가 많습니다. 다른 위치를 선택하세요.</p></div>`;
       return h;
     }
     h += `<p>절단선 <b>왼쪽 덩어리</b>만 떼어 내 봅니다. 이 덩어리도 가만히 있어야 하므로 <b>ΣF<sub>x</sub> = 0, ΣF<sub>y</sub> = 0, ΣM = 0</b>이 성립합니다. 잘린 부재 <b>${A.cut.map(o => T.members[o.k].name).join(', ')}</b>의 힘은 일단 <b>인장(덩어리에서 멀어지는 방향)</b>으로 가정합니다.</p>`;
@@ -655,7 +655,7 @@ const Truss = (() => {
         ${st.reveal ? `<div>→ ${Fn(mb)} = <span class="${kindCls(f)}">${fmt(e.val)} kN</span> → <span class="${kindCls(f)}">${kindTxt(f)}</span></div>` : ''}
       </div>`;
     });
-    h += `<p class="hint">💡 절단법의 요령: <b>"나머지 미지수들이 지나가는 점"</b>을 골라 모멘트를 잡으면 식 하나에 미지수 하나만 남습니다. 상현재 힘은 하현재 절점에 대해, 하현재 힘은 상현재 절점에 대해 모멘트를 잡는 것이 보통입니다.</p>`;
+    h += `<p class="hint">절단법의 요령: <b>"나머지 미지수들이 지나가는 점"</b>을 골라 모멘트를 잡으면 식 하나에 미지수 하나만 남습니다. 상현재 힘은 하현재 절점에 대해, 하현재 힘은 상현재 절점에 대해 모멘트를 잡는 것이 보통입니다.</p>`;
     h += `</div>`;
     return h;
   }
@@ -671,9 +671,15 @@ const Truss = (() => {
     $('truss-L-out').textContent = `${fmt(st.L)} m`;
     $('truss-h-out').textContent = `${fmt(st.h)} m`;
     $('truss-P-out').textContent = `${fmt(st.P)} kN`;
+    const m = T.members.length, j = T.nodes.length;
+    $('truss-det').innerHTML = `부재 m = ${m}, 반력 r = 3, 절점 j = ${j} → m + r = ${m + 3} ${m + 3 === 2 * j ? '= 2j → <b>정정</b>' : m + 3 > 2 * j ? '> 2j → 부정정' : '< 2j → 불안정'}`;
+    const is3d = st.mode === '3d';
+    $('truss-svg').toggleAttribute('hidden', is3d);
+    $('truss-3d').toggleAttribute('hidden', !is3d);
     const panel = $('truss-panel');
-    if (S.error) { clearSvg($('truss-svg')); panel.innerHTML = `<div class="dcard">${S.error}</div>`; return; }
+    if (S.error) { clearSvg($('truss-svg')); panel.innerHTML = `<div class="panel">${S.error}</div>`; return; }
     if (st.mode === 'result') { renderResult(); panel.innerHTML = resultPanel(); }
+    else if (is3d) { render3D(); panel.innerHTML = resultPanel(); }
     else if (st.mode === 'joints') {
       const steps = renderJoints();
       panel.innerHTML = jointsPanel(steps);
@@ -684,6 +690,21 @@ const Truss = (() => {
       panel.innerHTML = sectionsPanel(A);
     }
     manageAnim();
+  }
+
+  let t3d = null;
+  function render3D() {
+    $('truss-title').textContent = '3D 트러스 교량';
+    $('truss-tag').textContent = '같은 트러스 두 개를 가로보로 연결한 교량입니다';
+    if (!t3d) {
+      t3d = Truss3D.make($('truss-3d'));
+      if (!t3d) return;
+      $('t3d-flow').addEventListener('change', e => t3d.setFlow(e.target.checked));
+      $('t3d-deform').addEventListener('change', e => t3d.setDeform(e.target.checked));
+    }
+    const loaded = T.nodes.map((n, i) => i).filter(i => loadOf(i));
+    t3d.update({ nodes: T.nodes, members: T.members, F: S.F, Fmax: S.Fmax, u: S.u, L: st.L, h: st.h, pin: T.pin, roller: T.roller, loaded, type: st.type });
+    t3d.start();
   }
 
   function rebuild(keepLoads = false) {
