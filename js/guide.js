@@ -271,7 +271,7 @@ const Guide = (() => {
   /* =========================================================
      레슨 3: 절점으로 나누기 (게임)
      ========================================================= */
-  const g3 = { e: 0, known: new Set(), sel: null, selM: null, msg: null, order: [], hint: null, shake: null };
+  const g3 = { e: 0, known: new Set(), sel: null, selM: null, msg: null, order: [], hint: null, shake: null, mode: 'goal', goal: null, plan: [] };
   const RJ = 9;
 
   const unknownOf = i => model.inc[i].filter(k => !g3.known.has(k));
@@ -302,6 +302,7 @@ const Guide = (() => {
       const ax = x1 + ux * off, ay = y1 + uy * off, bx = x2 - ux * off, by = y2 - uy * off;
       const known = g3.known.has(k), f = M.F[k], kd = TC(f);
       const mg = svgEl('g', { class: 'mb', 'data-m': k }, g);
+      if (g3.goal === k) svgEl('line', { x1: ax, y1: ay, x2: bx, y2: by, style: 'stroke:var(--violet);stroke-width:24px;stroke-linecap:round;opacity:.3', class: g3.known.has(k) ? null : 'pulse' }, mg);
       if (g3.selM === k) svgEl('line', { x1: ax, y1: ay, x2: bx, y2: by, style: 'stroke:var(--hl);stroke-width:22px;stroke-linecap:round;opacity:.55' }, mg);
       const col = known ? colOf(f) : 'var(--zero)';
       const w = known ? 4 + 6 * Math.abs(f) / M.Fmax : 3;
@@ -410,6 +411,7 @@ const Guide = (() => {
   }
 
   function sideG3() {
+    if (g3.mode === 'goal') { goalSideG3(); return; }
     const M = model, total = M.members.length, done = g3.known.size;
     let h = `<div class="gd-progress"><span>풀린 부재</span><b>${done} / ${total}</b><div class="bar"><i style="width:${done / total * 100}%"></i></div></div>`;
     if (g3.msg) h += `<div class="gd-msg ${g3.msg.cls}">${g3.msg.html}</div>`;
@@ -455,6 +457,7 @@ const Guide = (() => {
       g3.msg = { cls: 'ok', html: `<b>${g3.order.length}번째 절점: ${nm}</b> — 모르는 힘 ${u.length}개(${names})를 ΣF<sub>x</sub>, ΣF<sub>y</sub>로 구했습니다.` +
         (g3.known.size === M.members.length ? '<br>모든 부재를 풀었습니다. 순서: ' + g3.order.map(j => M.nodes[j].name).join(' → ') : '') };
     }
+    if (g3.mode === 'goal') goalHint3();
     drawG3(); sideG3();
   }
 
@@ -483,7 +486,7 @@ const Guide = (() => {
   /* =========================================================
      레슨 4: 절단으로 나누기 (가위)
      ========================================================= */
-  const g4 = { cut: new Set(), e: 0, target: null, side: 0, reveal: false, preset: -1, bad: -1 };
+  const g4 = { cut: new Set(), e: 0, target: null, side: 0, reveal: false, preset: -1, bad: -1, mode: 'goal', goal: null, cands: [], ci: 0 };
 
   function analyzeCut() {
     const M = model, n = M.nodes.length;
@@ -565,6 +568,7 @@ const Guide = (() => {
       if (!cut) {
         const [ax, ay] = P(mb.a), [bx, by] = P(mb.b);
         const mg = svgEl('g', { class: 'mb', 'data-m': k }, gOf(mb.a));
+        if (g4.goal === k) svgEl('line', { x1: ax, y1: ay, x2: bx, y2: by, style: 'stroke:var(--violet);stroke-width:22px;stroke-linecap:round;opacity:.3', class: 'pulse' }, mg);
         svgEl('line', { x1: ax, y1: ay, x2: bx, y2: by, style: 'stroke:var(--beam);stroke-width:4px;stroke-linecap:round;opacity:.75' }, mg);
         svgEl('line', { x1: ax, y1: ay, x2: bx, y2: by, style: 'stroke:transparent;stroke-width:20px' }, mg);
         return;
@@ -612,7 +616,7 @@ const Guide = (() => {
 
     // 모멘트 중심
     if (showSide) drawMomentCenter(svg, A, T);
-    $('g4-tag').textContent = !g4.cut.size ? '부재를 클릭해서 자르세요' : A.ok ? (g4.reveal ? '실제 힘: 파랑 = 인장, 빨강 = 압축' : '모르는 힘은 모두 인장(밖으로)으로 가정') : '규칙을 확인하세요';
+    $('g4-tag').textContent = !g4.cut.size ? (g4.mode === 'goal' ? '구하고 싶은 부재를 클릭하세요' : '부재를 클릭해서 자르세요') : A.ok ? (g4.reveal ? '실제 힘: 파랑 = 인장, 빨강 = 압축' : '모르는 힘은 모두 인장(밖으로)으로 가정') : '규칙을 확인하세요';
   }
 
   /* 선택한 부재를 구하는 식: 다른 두 부재의 교점 O에 대한 모멘트 (평행이면 직각 방향 힘의 합) */
@@ -682,11 +686,13 @@ const Guide = (() => {
 
   function sideG4() {
     const M = model, A = analyzeCut();
+    const pre = g4.mode === 'goal' ? goalSideG4(A) : null;
+    if (pre && pre.only) { $('g4-side').innerHTML = pre.html; $('g4-reveal').disabled = true; return; }
     const li = (st, html) => `<li class="${st}"><i></i><span>${html}</span></li>`;
     const s1 = !g4.cut.size ? 'todo' : A.valid ? 'ok' : 'bad';
     const s2 = !A.valid ? 'todo' : (A.crossing.length <= 3 && !A.wasted.length) ? 'ok' : 'bad';
     const s3 = !A.valid || A.crossing.length !== 3 ? (A.valid && A.crossing.length < 3 && !A.wasted.length ? 'ok' : 'todo') : (A.concurrent || A.parallel) ? 'bad' : 'ok';
-    let h = `<ul class="gd-checks">
+    let h = (pre ? pre.html + '<div class="gd-rest">' : '') + `<ul class="gd-checks">
       ${li(s1, '트러스가 <b>완전히 두 조각</b>으로 나뉜다')}
       ${li(s2, '잘린 부재가 <b>3개 이하</b> (식은 ΣF<sub>x</sub>, ΣF<sub>y</sub>, ΣM 3개)')}
       ${li(s3, '잘린 3부재가 <b>한 점에서 모두 만나지 않고</b>, 모두 평행하지도 않다')}
@@ -730,6 +736,7 @@ const Guide = (() => {
       } else h += `<p class="hint">칩을 눌러 구할 부재를 고르면, 모멘트 중심 O와 팔길이 d를 그림에 표시합니다.</p>`;
       h += `</div>`;
     }
+    if (pre) h += '</div>';
     $('g4-side').innerHTML = h;
     $('g4-reveal').textContent = g4.reveal ? '답 숨기기' : '답 보기';
     $('g4-reveal').disabled = !A.ok;
@@ -870,6 +877,204 @@ const Guide = (() => {
   }
 
   /* =========================================================
+     목표 부재 모드: "이 부재를 구하고 싶다" → 풀이 경로 / 자르는 위치 안내
+     ========================================================= */
+  function memberKind(k) {
+    const mb = model.members[k], a = model.nodes[mb.a], b = model.nodes[mb.b];
+    if (a.y > 0 && b.y > 0) return '상현재(위쪽 부재)';
+    if (a.y === 0 && b.y === 0) return '하현재(아래쪽 부재)';
+    if (Math.abs(a.x - b.x) < 1e-9) return '수직재';
+    if ([mb.a, mb.b].some(i => i === model.pin || i === model.roller)) return '단부 경사재';
+    return '사재(대각선 부재)';
+  }
+  const jointOrder = () => model.nodes.map((n, i) => i).sort((a, b) => model.nodes[a].x - model.nodes[b].x || model.nodes[a].y - model.nodes[b].y);
+
+  /* 절점법: 목표 부재까지 가장 적은 절점 수로 가는 순서 (너비 우선 탐색, 상태 = 이미 아는 부재 집합) */
+  function planJoints(goal) {
+    const M = model, order = jointOrder();
+    const unk = (i, mask) => M.inc[i].filter(k => !(mask & (1 << k)));
+    const ok = (i, mask) => {
+      const u = unk(i, mask);
+      if (u.length === 0 || u.length > 2) return false;
+      if (u.length === 2) { const a = M.members[u[0]], b = M.members[u[1]]; if (Math.abs(a.ux * b.uy - a.uy * b.ux) < 1e-6) return false; }
+      return true;
+    };
+    const prev = new Map([[0, null]]), q = [0];
+    while (q.length) {
+      const mask = q.shift();
+      if (mask & (1 << goal)) {
+        const path = []; let m = mask;
+        while (prev.get(m)) { const [pm, j] = prev.get(m); path.unshift({ node: j, unknown: unk(j, pm) }); m = pm; }
+        return path;
+      }
+      for (const i of order) {
+        if (!ok(i, mask)) continue;
+        const nm = unk(i, mask).reduce((s, k) => s | (1 << k), mask);
+        if (!prev.has(nm)) { prev.set(nm, [mask, i]); q.push(nm); }
+      }
+    }
+    return [];
+  }
+
+  function setGoal3(k) {
+    g3.goal = k; g3.plan = planJoints(k);
+    g3.known = new Set(); g3.sel = null; g3.selM = null; g3.order = []; g3.msg = null;
+    goalHint3(); drawG3(); sideG3();
+  }
+  function goalHint3() {
+    const nx = g3.plan.find(p => p.unknown.some(k => !g3.known.has(k)));
+    g3.hint = g3.goal !== null && !g3.known.has(g3.goal) && nx ? nx.node : null;
+  }
+  function nextGoal3() {
+    const nx = g3.plan.find(p => p.unknown.some(k => !g3.known.has(k)));
+    if (nx) { clickJoint(nx.node); if (g3.e < 0.5) explodeG3(1); }
+  }
+
+  function goalSideG3() {
+    const M = model;
+    let h = '';
+    if (g3.goal === null) {
+      h = `<div class="gd-msg">그림에서 <b>구하고 싶은 부재</b>를 클릭하세요. 그 부재까지 가장 빨리 도착하는 절점 순서와, 각 절점을 왜 그 순서로 푸는지 알려 줍니다.</div>`;
+      $('g3-side').innerHTML = h; return;
+    }
+    const k = g3.goal, mb = M.members[k], doneGoal = g3.known.has(k);
+    const curIdx = g3.plan.findIndex(p => p.unknown.some(j => !g3.known.has(j)));
+    h += `<div class="gd-goal"><span class="gd-goal-tag">목표</span><b>F${sub(mb.name)}</b> <span class="muted">${memberKind(k)}</span></div>`;
+    h += `<div class="gd-plan"><h4>풀이 경로: 절점 ${g3.plan.length}개</h4><ol class="gd-route">`;
+    g3.plan.forEach((p, n) => {
+      const nd = M.nodes[p.node], done = n < curIdx || curIdx < 0, cur = n === curIdx;
+      const names = p.unknown.map(j => `<span class="${j === k ? 'gd-goalname' : ''}">${M.members[j].name}</span>`).join(', ');
+      const fresh = M.inc[p.node].filter(j => !p.unknown.includes(j));
+      let why;
+      if (n === 0) why = nd.y === 0 && (p.node === M.pin || p.node === M.roller) ? '지점 절점이라 반력을 이미 알고, 연결된 부재가 2개뿐이라 바로 풀립니다.' : `처음부터 모르는 부재가 ${p.unknown.length}개뿐입니다.`;
+      else why = fresh.length ? `앞 단계에서 ${fresh.map(j => M.members[j].name).join(', ')}를 구해 둬서 모르는 부재가 ${p.unknown.length}개로 줄었습니다.` : `모르는 부재가 ${p.unknown.length}개입니다.`;
+      h += `<li class="${done ? 'done' : cur ? 'cur' : ''}"><b>절점 ${nd.name}</b> — 모르는 힘 ${names}<br><small>${why}</small></li>`;
+    });
+    h += `</ol>`;
+    if (!doneGoal) {
+      const nx = g3.plan[curIdx];
+      h += `<p class="hint">깜빡이는 절점 <b>${M.nodes[nx.node].name}</b>을 클릭하거나 아래 버튼을 누르세요.</p>
+        <div class="gd-btns"><button class="btn sm primary" data-act="g3-next">다음 절점 풀기 ▶</button><button class="btn sm" data-act="g3-restart">처음부터</button></div>`;
+    } else {
+      h += `<div class="gd-btns"><button class="btn sm" data-act="g3-restart">경로 다시 보기</button><button class="btn sm" data-act="to-sec">절단법으로 구하면? →</button></div>`;
+    }
+    h += `</div>`;
+    h += `<div>`;
+    if (g3.msg) h += `<div class="gd-msg ${g3.msg.cls}">${g3.msg.html}</div>`;
+    if (doneGoal) h += memberStory(k) + `<p class="hint">절점법은 목표 부재까지 <b>옆 절점을 차례로 거쳐야</b> 합니다. 트러스 가운데 부재일수록 단계가 길어지므로, 한 부재만 필요하면 절단법이 빠릅니다.</p>`;
+    else if (g3.sel !== null) h += `<h4>방금 푼 절점 ${M.nodes[g3.sel].name}</h4><div id="g3-fbd-holder"></div>`;
+    else h += `<ol class="gd-steps"><li>절점 하나에서 쓸 수 있는 식은 ΣF<sub>x</sub> = 0, ΣF<sub>y</sub> = 0 <b>두 개</b>입니다.</li><li>그래서 모르는 부재가 2개 이하인 절점만 풀 수 있고, 하나를 풀면 옆 절점의 모르는 수가 줄어듭니다.</li><li>목표 부재에 닿을 때까지 이 과정을 반복합니다.</li></ol>`;
+    h += `</div>`;
+    $('g3-side').innerHTML = h;
+    const holder = $('g3-fbd-holder');
+    if (holder) holder.appendChild(jointFBD(g3.sel));
+  }
+
+  /* 절단법: 목표 부재를 지나는 올바른 자르기를 모두 찾아 순위를 매김 */
+  function evalCut(set, target, side) {
+    const sv = { cut: g4.cut, target: g4.target, side: g4.side };
+    g4.cut = new Set(set); g4.target = target; g4.side = side ?? 0;
+    const A = analyzeCut();
+    let R = null;
+    if (A.ok && target !== null && A.crossing.includes(target)) R = targetEq(A);
+    Object.assign(g4, sv);
+    return { A, R };
+  }
+  function extCount(A, c) {
+    return model.nodes.reduce((s, nd, i) => s + (A.comp[i] === c ? (model.loads[i] ? 1 : 0) + (i === model.pin || i === model.roller ? 1 : 0) : 0), 0);
+  }
+  function findCuts(goal) {
+    const M = model, n = M.nodes.length, out = [], seen = new Set();
+    for (let mask = 1; mask < (1 << n); mask++) {
+      if (!(mask & (1 << M.pin)) || mask === (1 << n) - 1) continue;
+      const S = new Set([...Array(n).keys()].filter(i => mask & (1 << i)));
+      const bd = M.members.map((m, k) => k).filter(k => S.has(M.members[k].a) !== S.has(M.members[k].b));
+      if (!bd.includes(goal) || bd.length > 3) continue;
+      const key = bd.join(','); if (seen.has(key)) continue; seen.add(key);
+      const { A } = evalCut(bd, goal, 0);
+      if (!A.ok) continue;
+      const sides = [0, 1].map(c => ({ c, ext: extCount(A, c), size: A.comp.filter(x => x === c).length }));
+      sides.sort((p, q) => p.ext - q.ext || p.size - q.size);
+      const side = sides[0].c;
+      const { R } = evalCut(bd, goal, side);
+      const single = R && (R.type === 'M' || R.type === 'F');
+      out.push({ set: bd, side, ext: sides[0].ext, type: R ? R.type : '2', score: (single ? 0 : 100) + sides[0].ext * 10 + sides[0].size });
+    }
+    return out.sort((a, b) => a.score - b.score);
+  }
+
+  /* 하중 없는 3부재 절점에서 두 부재가 일직선이면 나머지 하나는 0부재 */
+  function zeroNote(k) {
+    const M = model, mb = M.members[k];
+    for (const i of [mb.a, mb.b]) {
+      if (M.loads[i] || i === M.pin || i === M.roller || M.inc[i].length !== 3) continue;
+      const o = M.inc[i].filter(j => j !== k).map(j => M.members[j]);
+      if (Math.abs(o[0].ux * o[1].uy - o[0].uy * o[1].ux) < 1e-6) return `<div class="note"><b>더 빠른 방법</b>: 절점 ${M.nodes[i].name}에는 하중이 없고, 나머지 두 부재 ${o.map(m => m.name).join("·")}가 일직선입니다. 그러면 ${mb.name}는 계산 없이 <b>0부재</b>입니다. (직각 방향으로 힘을 맞춰 줄 상대가 없기 때문)</div>`;
+    }
+    return "";
+  }
+  function setGoal4(k) {
+    g4.goal = k; g4.cands = findCuts(k); g4.ci = 0; g4.reveal = false;
+    applyCand4();
+  }
+  function applyCand4() {
+    const c = g4.cands[g4.ci];
+    if (!c) { g4.cut = new Set(); g4.target = null; g4.e = 0; drawG4(); sideG4(); return; }
+    g4.cut = new Set(); g4.target = null; drawG4(); sideG4();
+    setTimeout(() => { g4.cut = new Set(c.set); g4.target = g4.goal; g4.side = c.side; cutChanged(); }, reduce() ? 0 : 450);
+  }
+
+  function goalSideG4(A) {
+    const M = model;
+    if (g4.goal === null) return { only: true, html: `<div class="gd-msg">그림에서 <b>구하고 싶은 부재</b>를 클릭하세요. 그 부재를 구하려면 어디를 잘라야 하는지 찾아서 직접 잘라 보여 줍니다.</div>` };
+    const k = g4.goal, mb = M.members[k];
+    let h = `<div class="gd-goal"><span class="gd-goal-tag">목표</span><b>F${sub(mb.name)}</b> <span class="muted">${memberKind(k)}</span></div>`;
+    if (!g4.cands.length) {
+      return { only: true, html: h + `<div class="gd-full"><div class="gd-msg bad">이 부재는 <b>한 번 자르기로는 구할 수 없습니다</b>. ${mb.name}를 지나면서 두 조각을 만드는 자르기는, 잘린 부재가 4개 이상이거나 3개가 한 점(절점)에서 모두 만납니다.</div>
+        <p>이럴 때는 다음 두 방법을 씁니다.</p><ol class="gd-steps"><li><b>절점법</b>: ${mb.name}가 연결된 절점을 오려 내어 ΣF로 구합니다.</li><li><b>두 번 자르기</b>: 먼저 다른 절단으로 옆 부재를 구한 뒤, 그 값을 넣고 다시 자릅니다.</li></ol>
+        ${zeroNote(k)}
+        <div class="gd-btns"><button class="btn sm primary" data-act="to-joint">절점법 경로 보기 →</button></div></div>` };
+    }
+    const c = g4.cands[g4.ci];
+    if (!A.ok || !A.crossing.includes(k)) return { only: true, html: h + `<div class="gd-msg">자를 위치를 찾는 중…</div>` };
+    const others = A.crossing.filter(j => j !== k).map(j => M.members[j].name);
+    const sideName = c.side === 0 ? 'A쪽(왼쪽)' : 'B쪽(오른쪽)';
+    const R = targetEq(A);
+    let how;
+    if (R.type === 'M') how = `${others.join('와 ')}의 연장선이 만나는 점 <b class="t-violet">O</b>를 중심으로 모멘트를 잡으면, 두 힘의 팔길이가 0이 되어 <b>식 하나에 ${mb.name}만</b> 남습니다.`;
+    else if (R.type === 'F') how = `${others.join('와 ')}가 서로 평행합니다. 그 직각 방향 힘의 합을 쓰면 두 힘이 빠지고 <b>${mb.name}만</b> 남습니다.`;
+    else how = `모르는 힘이 2개(${[mb.name, ...others].join(', ')})라서 ΣF<sub>x</sub>, ΣF<sub>y</sub> 두 식으로 풉니다. 사실상 절점 하나를 오려 낸 것과 같습니다.`;
+    h += `<div class="gd-plan"><h4>이렇게 자릅니다</h4><ol class="gd-route">
+      <li class="done"><b>칼이 ${mb.name}를 지나게</b> 넣습니다. 구하려는 부재를 자르지 않으면 그 힘이 식에 나타나지 않습니다.</li>
+      <li class="done"><b>같이 잘리는 부재: ${others.join(', ') || '없음'}</b> → 모르는 힘은 모두 ${A.crossing.length}개. 한 조각의 평형식은 3개(ΣF<sub>x</sub>, ΣF<sub>y</sub>, ΣM)이므로 풀 수 있습니다.</li>
+      <li class="done">칼이 트러스를 <b>위에서 아래까지</b> 끝까지 지나서 두 조각으로 나눕니다.</li>
+      <li class="done"><b>${sideName} 조각</b>을 봅니다. 하중·반력이 ${c.ext}개로 더 적어 식이 짧습니다.</li>
+      <li class="cur">${how}</li>
+    </ol>`;
+    if (g4.cands.length > 1) h += `<div class="gd-btns"><button class="btn sm" data-act="g4-alt">다른 자르는 방법 (${g4.ci + 1}/${g4.cands.length})</button></div>`;
+    h += `</div>`;
+    return { only: false, html: h };
+  }
+
+  function setMode3(v) {
+    g3.mode = v; g3.goal = null; g3.plan = []; g3.hint = null;
+    document.querySelectorAll('#g3-mode button').forEach(b => b.classList.toggle('active', b.dataset.v === v));
+    document.querySelectorAll('.g3-free').forEach(b => { b.hidden = v === 'goal'; });
+    resetG3();
+  }
+  function setMode4(v) {
+    g4.mode = v; g4.goal = null; g4.cands = []; g4.ci = 0;
+    document.querySelectorAll('#g4-mode button').forEach(b => b.classList.toggle('active', b.dataset.v === v));
+    document.querySelectorAll('.g4-free').forEach(b => { b.hidden = v === 'goal'; });
+    g4.cut = new Set(); g4.target = null; g4.reveal = false; cutChanged();
+  }
+  function defaultGoals() {
+    const M = model, find = names => M.members.findIndex(m => names.includes(m.name));
+    if (g3.mode === 'goal') setGoal3(find(['U1L2', 'L1U2']));
+    if (g4.mode === 'goal') setGoal4(find(['U1U2']));
+  }
+
+  /* =========================================================
      초기화
      ========================================================= */
   function setModel(type) {
@@ -877,7 +1082,9 @@ const Guide = (() => {
     document.querySelectorAll('[data-gtype]').forEach(b => b.classList.toggle('active', b.dataset.gtype === type));
     g3.known = new Set(); g3.sel = null; g3.selM = null; g3.msg = null; g3.order = []; g3.hint = null;
     g4.cut = new Set(); g4.target = null; g4.reveal = false; g4.preset = -1; g4.bad = -1; g4.e = 0;
+    g3.goal = null; g3.plan = []; g4.goal = null; g4.cands = []; g4.ci = 0;
     drawG3(); sideG3(); drawG4(); sideG4();
+    defaultGoals();
   }
 
   function segBind(id, fn) {
@@ -907,31 +1114,44 @@ const Guide = (() => {
     $('g3-svg').addEventListener('click', e => {
       const j = e.target.closest('[data-j]'), m = e.target.closest('[data-m]');
       if (j) clickJoint(+j.dataset.j);
+      else if (m && g3.mode === 'goal') setGoal3(+m.dataset.m);
       else if (m) {
         const k = +m.dataset.m;
         if (!g3.known.has(k)) { g3.msg = { cls: '', html: `${model.members[k].name}는 아직 모릅니다. 양 끝 절점 중 하나를 먼저 풀어야 합니다.` }; g3.selM = null; }
         else { g3.selM = g3.selM === k ? null : k; g3.msg = null; if (g3.e < 0.5) explodeG3(1); }
         drawG3(); sideG3();
-      } else { g3.selM = null; g3.sel = null; drawG3(); sideG3(); }
+      } else if (g3.mode !== 'goal') { g3.selM = null; g3.sel = null; drawG3(); sideG3(); }
     });
-    $('g3-side').addEventListener('click', e => e.stopPropagation());
+    segBind('g3-mode', setMode3);
+    segBind('g4-mode', setMode4);
+    $('g3-side').addEventListener('click', e => {
+      const a = e.target.closest('[data-act]'); if (!a) return;
+      if (a.dataset.act === 'g3-next') nextGoal3();
+      if (a.dataset.act === 'g3-restart') setGoal3(g3.goal);
+      if (a.dataset.act === 'to-sec') { const k = g3.goal; if (g4.mode !== 'goal') setMode4('goal'); setGoal4(k); $('g-4').scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+    });
     // 레슨 4
     $('g4-svg').addEventListener('click', e => {
       const m = e.target.closest('[data-m]'); if (!m) return;
       const k = +m.dataset.m;
+      if (g4.mode === 'goal') { setGoal4(k); return; }
       if (g4.cut.has(k)) g4.cut.delete(k); else g4.cut.add(k);
       g4.reveal = false; cutChanged();
     });
     $('g4-side').addEventListener('click', e => {
-      const t = e.target.closest('[data-tg]'), s = e.target.closest('[data-side]');
+      const t = e.target.closest('[data-tg]'), s = e.target.closest('[data-side]'), a = e.target.closest('[data-act]');
+      if (a && a.dataset.act === 'g4-alt') { g4.ci = (g4.ci + 1) % g4.cands.length; g4.reveal = false; applyCand4(); return; }
+      if (a && a.dataset.act === 'to-joint') { const k = g4.goal; if (g3.mode !== 'goal') setMode3('goal'); setGoal3(k); $('g-3').scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
       if (t) { g4.target = +t.dataset.tg; drawG4(); sideG4(); }
       if (s) { g4.side = +s.dataset.side; drawG4(); sideG4(); }
     });
     $('g4-preset').addEventListener('click', () => {
+      if (g4.mode === 'goal') setMode4('free');
       const ps = presetCuts(); g4.preset = (g4.preset + 1) % ps.length;
       g4.cut = new Set(ps[g4.preset]); g4.reveal = false; g4.target = null; cutChanged();
     });
     $('g4-bad').addEventListener('click', () => {
+      if (g4.mode === 'goal') setMode4('free');
       const bs = badCuts(); g4.bad = (g4.bad + 1) % bs.length;
       g4.cut = new Set(bs[g4.bad]); g4.reveal = false; g4.target = null; cutChanged();
     });

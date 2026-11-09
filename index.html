@@ -298,14 +298,15 @@
     <article class="concept" id="g-3">
       <div class="gd-head"><span class="gd-num">3</span><div>
         <h3>절점법: 트러스를 절점으로 나누기</h3>
-        <p>절점법은 트러스를 <b>절점마다 동그랗게 오려 내어</b> 하나씩 푸는 방법입니다. 아래 트러스에서 절점을 직접 클릭해 순서대로 풀어 보세요. 절점 옆 숫자는 <b>아직 모르는 부재의 수</b>이고, <span class="gd-dot ok"></span> 초록색이면 지금 풀 수 있는 절점입니다.</p>
+        <p>절점법은 트러스를 <b>절점마다 동그랗게 오려 내어</b> 하나씩 푸는 방법입니다. <b>구할 부재 고르기</b>에서는 알고 싶은 부재를 클릭하면, 그 부재까지 가는 절점 순서와 이유를 한 단계씩 보여 줍니다. <b>직접 풀기</b>에서는 절점을 마음대로 클릭해 풀어 봅니다. 절점 옆 숫자는 <b>아직 모르는 부재의 수</b>이고, <span class="gd-dot ok"></span> 초록색이면 지금 풀 수 있는 절점입니다.</p>
       </div></div>
       <div class="gd-ctl">
         <div class="seg"><button data-gtype="pratt">프랫</button><button data-gtype="howe">하우</button><button data-gtype="warren">워렌</button></div>
+        <div class="seg" id="g3-mode"><button data-v="goal" class="active">구할 부재 고르기</button><button data-v="free">직접 풀기</button></div>
         <button class="btn sm primary" id="g3-explode" type="button">절점과 부재 떼어 놓기</button>
-        <button class="btn sm" id="g3-hint" type="button">힌트</button>
-        <button class="btn sm" id="g3-all" type="button">모두 풀기</button>
-        <button class="btn sm" id="g3-reset" type="button">처음부터</button>
+        <button class="btn sm g3-free" hidden id="g3-hint" type="button">힌트</button>
+        <button class="btn sm g3-free" hidden id="g3-all" type="button">모두 풀기</button>
+        <button class="btn sm g3-free" hidden id="g3-reset" type="button">처음부터</button>
       </div>
       <div class="gd-split">
         <div class="gd-figwrap"><span class="tag gd-figtag" id="g3-tag"></span><svg id="g3-svg" class="fig gd-fig grid-paper" viewBox="0 0 1000 420"></svg></div>
@@ -316,14 +317,15 @@
     <article class="concept" id="g-4">
       <div class="gd-head"><span class="gd-num">4</span><div>
         <h3>절단법: 어디를 어떻게 자를까</h3>
-        <p>절단법은 트러스를 <b>가위로 한 번 잘라 두 조각</b>으로 나누고, 한 조각만 보고 푸는 방법입니다. 부재를 클릭하면 잘리고, 다시 클릭하면 붙습니다. 오른쪽 규칙 세 개가 모두 초록이 되도록 잘라 보세요.</p>
+        <p>절단법은 트러스를 <b>가위로 한 번 잘라 두 조각</b>으로 나누고, 한 조각만 보고 푸는 방법입니다. <b>구할 부재 고르기</b>에서는 알고 싶은 부재를 클릭하면 어디를 왜 그렇게 잘라야 하는지 찾아서 잘라 보여 줍니다. <b>직접 자르기</b>에서는 부재를 클릭해 자르고(다시 클릭하면 붙음), 규칙 세 개를 지켰는지 확인합니다.</p>
       </div></div>
       <div class="gd-ctl">
         <div class="seg"><button data-gtype="pratt">프랫</button><button data-gtype="howe">하우</button><button data-gtype="warren">워렌</button></div>
-        <button class="btn sm primary" id="g4-preset" type="button">추천 자르기</button>
-        <button class="btn sm" id="g4-bad" type="button">잘못 자른 예</button>
+        <div class="seg" id="g4-mode"><button data-v="goal" class="active">구할 부재 고르기</button><button data-v="free">직접 자르기</button></div>
+        <button class="btn sm primary g4-free" hidden id="g4-preset" type="button">추천 자르기</button>
+        <button class="btn sm g4-free" hidden id="g4-bad" type="button">잘못 자른 예</button>
         <button class="btn sm" id="g4-reveal" type="button">답 보기</button>
-        <button class="btn sm" id="g4-clear" type="button">모두 붙이기</button>
+        <button class="btn sm g4-free" hidden id="g4-clear" type="button">모두 붙이기</button>
       </div>
       <div class="gd-split">
         <div class="gd-figwrap"><span class="tag gd-figtag" id="g4-tag"></span><svg id="g4-svg" class="fig gd-fig grid-paper" viewBox="0 0 1000 420"></svg></div>
