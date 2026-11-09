@@ -31,10 +31,10 @@ const Beam = (() => {
 
   // 단면: I [10⁶ mm⁴], h·B [mm]
   const SECTIONS = [
-    { name: 'H-200×100×5.5×8', I: 18.4, h: 200, B: 100, type: 'H' },
-    { name: 'H-300×150×6.5×9', I: 72.1, h: 300, B: 150, type: 'H' },
-    { name: 'H-400×200×8×13', I: 237, h: 400, B: 200, type: 'H' },
-    { name: 'H-600×200×11×17', I: 776, h: 600, B: 200, type: 'H' },
+    { name: 'H-200×100×5.5×8', I: 18.4, h: 200, B: 100, tw: 5.5, tf: 8, type: 'H' },
+    { name: 'H-300×150×6.5×9', I: 72.1, h: 300, B: 150, tw: 6.5, tf: 9, type: 'H' },
+    { name: 'H-400×200×8×13', I: 237, h: 400, B: 200, tw: 8, tf: 13, type: 'H' },
+    { name: 'H-600×200×11×17', I: 776, h: 600, B: 200, tw: 11, tf: 17, type: 'H' },
     { name: 'RC 400×600 (직사각형)', I: 7200, h: 600, B: 400, type: 'rect' },
   ];
   const st = {
@@ -44,6 +44,81 @@ const Beam = (() => {
   let uid = 1, res = null, cursorX = null, drag = null, sweeping = null, b3d = null;
   const sec = () => SECTIONS[st.sec];
   const sigmaOf = M => M * (sec().h / 2) / st.I; // MPa (M kN·m, I 10⁶ mm⁴)
+
+  /* 처짐 표시 배율: 정해진 단계에서만 바뀌므로, 같은 배율 안에서는 처짐이 커지면 그림도 그만큼 커진다 */
+  const U3 = 0.6; // beam3d.js 와 같은 축척 (화면 단위 / m)
+  const KSTEPS = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000];
+  const PXSTEPS = [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200];
+  let k3 = null, realScale = false, s2 = null, snapPrev = null, baseline = null, lastAct = 0, lastBanner = '';
+  function pickK(dmax) {
+    if (realScale) return 1;
+    const disp = k => dmax / 1000 * U3 * k;
+    if (k3 && k3 > 1 && disp(k3) <= 1.5 && disp(k3) >= 0.15) return k3;
+    let k = 1; for (const c of KSTEPS) if (disp(c) <= 1.1) k = c;
+    return k;
+  }
+  function pickS2(dmax) {
+    const d = c => dmax * c;
+    if (s2 && d(s2) <= 88 && d(s2) >= 12) return s2;
+    let k = PXSTEPS[0]; for (const c of PXSTEPS) if (d(c) <= 72) k = c;
+    return k;
+  }
+  /* 무엇을 바꿨을 때 처짐이 몇 배가 되었는지 (조작 직전 상태와 비교) */
+  function snapshot(d) { return { L: st.L, EI: st.E * st.I, d, sup: st.support, loads: st.loads.map(l => Object.assign({}, l)) }; }
+  function describeChange(a, b) {
+    if (!a) return '';
+    const same = (p, q) => Math.abs(p - q) < 1e-9;
+    const samePos = (A, B, sc) => A.length === B.length && A.every((l, i) => {
+      const m = B[i]; if (l.type !== m.type) return false;
+      return l.type === 'dist' ? same(l.x1 * sc, m.x1) && same(l.x2 * sc, m.x2) : same(l.x * sc, m.x);
+    });
+    const mag = l => l.type === 'point' ? [l.P] : l.type === 'moment' ? [l.M] : [l.w1, l.w2];
+    const sameMag = (A, B) => A.every((l, i) => mag(l).every((v, j) => same(v, mag(B[i])[j])));
+    const r = a.d > 1e-9 ? b.d / a.d : NaN;
+    if (Math.abs(a.d - b.d) < 1e-9 && a.sup === b.sup && same(a.L, b.L) && same(a.EI, b.EI)) return '';
+    const head = `δ<sub>max</sub> ${fmt(a.d, 2)} → ${fmt(b.d, 2)} mm` + (isFinite(r) ? ` <b>(×${fmt(r, 3)})</b>` : '');
+    const dL = !same(a.L, b.L), dEI = !same(a.EI, b.EI), dSup = a.sup !== b.sup;
+    const loadsSame = samePos(a.loads, b.loads, 1) && sameMag(a.loads, b.loads);
+    const loadsScaled = dL && samePos(a.loads, b.loads, b.L / a.L) && sameMag(a.loads, b.loads);
+    // 한 가지만 바뀌었을 때만 원인과 법칙을 말한다
+    if (dSup && !dL && !dEI && loadsSame)
+      return `<b>지지 조건 변경</b> · ${head}<br><small>하중이 같아도 지점이 처짐과 회전을 더 많이 막을수록 처짐이 작아집니다.</small>`;
+    if (dL && !dEI && !dSup && loadsScaled) {
+      const lr = b.L / a.L, types = new Set(a.loads.map(l => l.type));
+      let law = '';
+      if (types.size === 1) {
+        const t = [...types][0], n = t === 'dist' ? 4 : t === 'point' ? 3 : 2, pred = Math.pow(lr, n);
+        const nm = t === 'dist' ? '분포하중(w 일정)' : t === 'point' ? '집중하중(P 일정)' : '모멘트 하중';
+        if (isFinite(r) && Math.abs(r / pred - 1) < 0.005) law = `${nm}의 크기와 상대 위치가 같으면 δ ∝ L<sup>${n}</sup> → (${fmt(b.L, 2)}/${fmt(a.L, 2)})<sup>${n}</sup> = ${fmt(pred, 3)}배. 길이보다 처짐이 훨씬 빨리 커집니다.`;
+      }
+      return `<b>L ${fmt(a.L, 2)} → ${fmt(b.L, 2)} m</b> · ${head}` + (law ? `<br><small>${law}</small>` : '');
+    }
+    if (dEI && !dL && !dSup && loadsSame)
+      return `<b>EI ${fmt(a.EI, 0)} → ${fmt(b.EI, 0)} kN·m²</b> · ${head}<br><small>δ ∝ 1/EI → 강성이 ${fmt(b.EI / a.EI, 3)}배면 처짐은 ${fmt(a.EI / b.EI, 3)}배.</small>`;
+    if (!dL && !dEI && !dSup && samePos(a.loads, b.loads, 1)) {
+      const ra = a.loads.flatMap(mag), rb = b.loads.flatMap(mag), ratios = [];
+      let ok = true;
+      ra.forEach((v, i) => { if (Math.abs(v) > 1e-9) ratios.push(rb[i] / v); else if (Math.abs(rb[i]) > 1e-9) ok = false; });
+      if (ok && ratios.length && ratios.every(v => Math.abs(v - ratios[0]) < 1e-9))
+        return `<b>하중 ×${fmt(ratios[0], 3)}</b> · ${head}<br><small>선형 탄성: 모든 하중을 c배 하면 반력·모멘트·처짐도 정확히 c배입니다.</small>`;
+      return `<b>하중 크기 변경</b> · ${head}`;
+    }
+    if (!dL && !dEI && !dSup) return `<b>하중 배치 변경</b> · ${head}`;
+    return `<b>여러 조건 변경</b> · ${head}`;
+  }
+  function trackChange(d) {
+    const now = performance.now(), cur = snapshot(d);
+    if (now - lastAct > 900) baseline = snapPrev;
+    lastAct = now; snapPrev = cur;
+    lastBanner = describeChange(baseline, cur);
+  }
+  /* 롤러 수평 이동(mm): 지점이 보 하단에 있으므로 = 핀~롤러 사이 하단 섬유의 길이 변화 = (h/2)(θ_B − θ_A) */
+  function rollerShift() {
+    const ro = res.sups.find(x => x.type === 'roller'); if (!ro) return null;
+    const ref = res.sups.find(x => x.type === 'pin') || res.sups.find(x => x.type === 'fixed');
+    const th = ref && ref.type === 'pin' ? res.theta[ref.node] : 0;
+    return sec().h / 2 * (res.theta[ro.node] - th);
+  }
 
   const xp = x => ML + x / st.L * (W - ML - MR);
   const xm = px => (px - ML) / (W - ML - MR) * st.L;
@@ -159,16 +234,25 @@ const Beam = (() => {
     return { V, M };
   }
 
-  function deflAt(x) {
-    const { nodes, defl } = res;
-    for (let i = 0; i < nodes.length - 1; i++) {
-      if (x <= nodes[i + 1] + 1e-12) {
-        const t = (x - nodes[i]) / (nodes[i + 1] - nodes[i] || 1);
-        return defl[i] + (defl[i + 1] - defl[i]) * clamp(t, 0, 1);
-      }
-    }
-    return defl[defl.length - 1];
+  /* 처짐(mm)·처짐각(rad): 보 요소의 3차 Hermite 형상함수로 절점 값(v, θ)을 보간 */
+  function seg(x) {
+    const { nodes } = res;
+    let i = 0;
+    while (i < nodes.length - 2 && x > nodes[i + 1]) i++;
+    const l = nodes[i + 1] - nodes[i] || 1;
+    return { i, l, t: clamp((x - nodes[i]) / l, 0, 1) };
   }
+  function deflAt(x) {
+    const { defl, theta } = res, { i, l, t } = seg(x);
+    const t2 = t * t, t3 = t2 * t;
+    return (1 - 3 * t2 + 2 * t3) * defl[i] + (t - 2 * t2 + t3) * l * theta[i] * 1000 + (3 * t2 - 2 * t3) * defl[i + 1] + (t3 - t2) * l * theta[i + 1] * 1000;
+  }
+  function slopeAt(x) {
+    const { defl, theta } = res, { i, l, t } = seg(x);
+    const t2 = t * t;
+    return ((6 * t2 - 6 * t) * defl[i] / 1000 + (1 - 4 * t + 3 * t2) * l * theta[i] + (6 * t - 6 * t2) * defl[i + 1] / 1000 + (3 * t2 - 2 * t) * l * theta[i + 1]) / l;
+  }
+
 
   function extremes() {
     const { xs, V, M, defl, nodes } = res;
@@ -240,7 +324,7 @@ const Beam = (() => {
     if (st.overlay && res && !res.error) {
       const mx = Math.max(...res.defl.map(Math.abs));
       if (mx > 1e-9) {
-        const sc = 38 / mx;
+        const sc = s2 * 0.5;
         const d = res.nodes.map((x, i) => `${i ? 'L' : 'M'}${xp(x).toFixed(1)},${(BY - res.defl[i] * sc).toFixed(1)}`).join(' ');
         svgEl('path', { d, style: 'fill:none;stroke:var(--defl);stroke-width:3;stroke-dasharray:7 5;opacity:.85' }, g);
       }
@@ -405,7 +489,13 @@ const Beam = (() => {
     const svg = $('beam-svg-defl');
     clearSvg(svg);
     const g = clipGroup(svg, 'beam-svg-defl', 200);
-    const y0 = 100, mx = Math.max(1e-12, ...res.defl.map(Math.abs)), sc = 72 / mx;
+    const y0 = 100, sc = s2;
+    { // 세로 축척 막대
+      const bar = 40, bx = 22;
+      svgEl('line', { x1: bx, y1: y0 - bar / 2, x2: bx, y2: y0 + bar / 2, style: 'stroke:var(--muted);stroke-width:2' }, svg);
+      [y0 - bar / 2, y0 + bar / 2].forEach(yy => svgEl('line', { x1: bx - 5, y1: yy, x2: bx + 5, y2: yy, style: 'stroke:var(--muted);stroke-width:2' }, svg));
+      svgText(svg, bx - 8, y0 + bar / 2 + 16, `${fmt(bar / sc, 3)} mm`, { 'font-size': 11, class: 'svg-muted val-label' });
+    }
     const Y = v => y0 - v * sc;
     svgEl('line', { x1: xp(0), y1: y0, x2: xp(st.L), y2: y0, style: 'stroke:var(--zero);stroke-width:2;stroke-dasharray:6 5' }, g);
     res.sups.forEach(s => {
@@ -669,6 +759,9 @@ const Beam = (() => {
       return;
     }
     const ex = extremes();
+    const dmax = Math.max(0, ...res.defl.map(Math.abs));
+    k3 = pickK(dmax); s2 = pickS2(dmax);
+    trackChange(dmax);
     renderLoad();
     maps.sfd = renderDiagram('beam-svg-sfd', res.V, { color: 'var(--pos)', labels: sfdLabels() });
     maps.bmd = renderDiagram('beam-svg-bmd', res.M, { color: 'var(--neg)', flip: st.tensionSide, labels: bmdLabels(ex) });
@@ -807,21 +900,40 @@ const Beam = (() => {
   /* ---------------- 3D 보기 ---------------- */
   function update3D(ex, animate = false) {
     if (st.view !== '3d' || !res || res.error) return;
-    if (!b3d) { b3d = Beam3D.make($('beam-3d')); animate = true; if (!b3d) return; }
+    if (!b3d) { b3d = Beam3D.make($('beam-3d'), { onLoad: showLoadPct }); animate = true; if (!b3d) return; }
     const Rmax = Math.max(1e-9, ...res.sups.map(s => Math.abs(s.R)));
     b3d.update({
       L: st.L, sups: res.sups, loads: st.loads, nodes: res.nodes, defl: res.defl,
-      deflAt, Mat: x => VMat(x).M, Mabs: Math.max(Math.abs(ex.Mmax.v), Math.abs(ex.Mmin.v)), Rmax,
-      sec: { type: sec().type, h: sec().h, B: sec().B },
+      deflAt, slopeAt, k: k3, Mat: x => VMat(x).M, Mabs: Math.max(Math.abs(ex.Mmax.v), Math.abs(ex.Mmin.v)), Rmax,
+      sec: { type: sec().type, h: sec().h, B: sec().B, tw: sec().tw, tf: sec().tf },
     }, { animate });
+    renderInfo3D(ex);
     b3d.start();
   }
+  function showLoadPct(f) {
+    const e = $('beam-3d-load'); if (!e) return;
+    const p = Math.round(f * 100);
+    e.textContent = f < 1 ? `하중 ${p}% → 반력·응력·처짐도 ${p}% (선형 탄성)` : '';
+  }
+  function renderInfo3D(ex) {
+    const el = $('beam-3d-info'); if (!el) return;
+    const d = ex.D.v, da = Math.abs(d), ro = rollerShift();
+    el.innerHTML = `<div class="vi-main"><span>δ<sub>max</sub></span><b>${fmt(da, 2)} mm ${d < -1e-9 ? '↓' : d > 1e-9 ? '↑' : ''}</b>${da > 1e-9 ? `<em>= L/${Math.round(st.L * 1000 / da).toLocaleString()}</em>` : ''}</div>
+      <div class="vi-row">처짐 표시 <b>×${k3.toLocaleString()}</b> ${realScale ? '(실제 크기)' : '확대'} · 길이·단면은 실제 비율 <button class="vi-btn" data-real type="button">${realScale ? '확대해서 보기' : '실제 크기로 보기'}</button></div>
+      ${ro !== null && Math.abs(ro) > 1e-6 ? `<div class="vi-row">롤러 수평 이동 <b>${fmt(Math.abs(ro), 3)} mm ${ro > 0 ? '→' : '←'}</b><small>지점이 보 아래에 있어, 보 아래 섬유가 ${ro > 0 ? '늘어난' : '줄어든'} 길이 (h/2)(θ<sub>B</sub> − θ<sub>A</sub>)만큼 움직입니다.</small></div>` : ''}
+      <div class="vi-load" id="beam-3d-load"></div>
+      ${lastBanner ? `<div class="vi-banner">${lastBanner}</div>` : ''}`;
+  }
   function bindView() {
+    $('beam-3d').insertAdjacentHTML('afterend', '<div class="v3d-info" id="beam-3d-info"></div>');
+    $('beam-3d-info').addEventListener('click', e => { if (e.target.closest('[data-real]')) { realScale = !realScale; k3 = null; update(false); } });
+    $('beam-3d-info').addEventListener('pointerdown', e => e.stopPropagation());
     const setView = v => {
       st.view = v;
       document.querySelectorAll('#beam-view button').forEach(b => b.classList.toggle('active', b.dataset.v === v));
       $('beam-3d').toggleAttribute('hidden', v !== '3d');
       $('beam-svg-load').toggleAttribute('hidden', v !== '2d');
+      $('beam-3d-info').toggleAttribute('hidden', v !== '3d');
       if (v === '3d' && res && !res.error) update3D(extremes());
     };
     document.querySelectorAll('#beam-view button').forEach(b => b.addEventListener('click', () => setView(b.dataset.v)));

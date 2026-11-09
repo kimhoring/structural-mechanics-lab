@@ -1,22 +1,31 @@
 'use strict';
-/* 3D 보 모델: 단면을 보 축을 따라 쓸어 만든 메시. 처짐만큼 휘고, 휨응력 σ = −M·y/I 를 색으로 표시 */
+/* 3D 보 모델 (선형 탄성 · 미소변형 이론을 확대해서 보여 줌)
+   - 길이·단면 치수는 실제 비율 (1 m = U 화면 단위)
+   - 처짐은 정해진 배율 k 로만 확대 (k 는 화면에 표시)
+   - 오일러-베르누이 가정: 단면은 평면을 유지하고 변형된 축에 수직 → 수평변위 u = −y·θ
+   - 핀: 보 하단의 핀 점이 움직이지 않고 보가 그 점을 중심으로 회전
+   - 롤러: 보 하단 섬유가 늘어난 만큼 윗판이 수평 이동, 바퀴는 미끄럼 없이 굴러 그 절반만 이동
+   - 고정단: 처짐·처짐각 0 → 단면이 벽에 붙은 채 수직 유지
+   - 하중 재하: 하중·반력·처짐·응력이 모두 같은 비율 f 로 함께 증가 (선형이므로 δ ∝ 하중) */
 
 const Beam3D = (() => {
-  const LEN = 10; // 화면상 보 길이
+  const U = 0.6;          // 화면 단위 / m
+  const ROLL_R = 0.075;   // 롤러 바퀴 반지름 (화면 단위)
 
-  function make(container) {
-    const v = Viewer3D.create(container, { theta: -0.5, phi: 1.12, r: 15.5, ty: -0.3, groundY: -2.2 });
+  function make(container, opt = {}) {
+    const v = Viewer3D.create(container, { theta: -0.42, phi: 1.22, r: 12, ty: -0.3, groundY: -2.1 });
     if (!v) return null;
-    const beamG = new THREE.Group(), deco = new THREE.Group();
-    v.root.add(beamG, deco);
+    const beamG = new THREE.Group(), deco = new THREE.Group(), ghostG = new THREE.Group();
+    v.root.add(beamG, deco, ghostG);
     let model = null, mesh = null, base = null, f = 1, animStart = null;
+    let kCur = 1;
     const tmpC = new THREE.Color();
 
+    /* 단면 외곽선 (y: 위, z: 폭) — 실제 치수 비율 */
     function profile(sec) {
-      // 단면 외곽선 (y: 위, z: 폭), 화면 단위
-      const H = 0.62;
-      if (sec.type === 'rect') { const B = 0.42; return { pts: [[-H / 2, -B / 2], [-H / 2, B / 2], [H / 2, B / 2], [H / 2, -B / 2]], H }; }
-      const B = 0.62 * sec.B / sec.h, tf = 0.075, tw = 0.045;
+      const H = sec.h / 1000 * U, B = sec.B / 1000 * U;
+      if (sec.type === 'rect') return { pts: [[-H / 2, -B / 2], [-H / 2, B / 2], [H / 2, B / 2], [H / 2, -B / 2]], H };
+      const tf = sec.tf / 1000 * U, tw = sec.tw / 1000 * U;
       return {
         H, pts: [
           [-H / 2, -B / 2], [-H / 2, B / 2], [-H / 2 + tf, B / 2], [-H / 2 + tf, tw / 2], [H / 2 - tf, tw / 2], [H / 2 - tf, B / 2],
@@ -28,16 +37,13 @@ const Beam3D = (() => {
     function build() {
       Viewer3D.clearGroup(beamG);
       const { pts, H } = profile(model.sec);
-      const N = 120, np = pts.length;
+      const N = 160, np = pts.length;
       const xs = []; for (let i = 0; i <= N; i++) xs.push(i / N);
-      // 측면: 외곽선의 각 변 × 각 분절 → 사각형 2개 (평면 셰이딩 위해 정점 비공유)
       const quads = [];
       for (let j = 0; j < N; j++) for (let k = 0; k < np; k++) {
         const a = pts[k], b = pts[(k + 1) % np];
-        // 외곽선 방향이 바깥 법선을 향하도록 정렬
         quads.push([[xs[j], a], [xs[j + 1], a], [xs[j + 1], b], [xs[j], b]]);
       }
-      // 끝면 삼각분할
       const contour = pts.map(p => new THREE.Vector2(p[1], p[0]));
       const tris = THREE.ShapeUtils.triangulateShape(contour, []);
       const verts = [];
@@ -52,39 +58,62 @@ const Beam3D = (() => {
       geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
       mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, metalness: 0.15, side: THREE.DoubleSide }));
       beamG.add(mesh);
-      // 원래 위치(점선 윤곽)
-      const ghost = new THREE.LineSegments(
-        new THREE.EdgesGeometry(new THREE.BoxGeometry(LEN, H, 0.02)),
-        new THREE.LineDashedMaterial({ color: 0x8a93a6, dashSize: 0.15, gapSize: 0.1, transparent: true, opacity: 0.6 }));
-      ghost.computeLineDistances();
-      beamG.add(ghost);
     }
 
-    // 처짐 형상(화면 단위) 보간
-    let dScale = 1, sArr = null, dArr = null, mArr = null;
-    function prepSamples() {
-      const N = 240, L = model.L;
-      sArr = []; dArr = []; mArr = [];
-      const dmax = Math.max(1e-12, ...model.nodes.map((x, i) => Math.abs(model.defl[i])));
-      dScale = 0.9 / dmax;
-      for (let i = 0; i <= N; i++) {
-        const x = L * i / N;
-        sArr.push(i / N); dArr.push(model.deflAt(x)); mArr.push(model.Mat(x));
+    /* 하중 전 원래 위치 (점선) */
+    function buildGhost() {
+      Viewer3D.clearGroup(ghostG);
+      const H = base.H, L = model.L * U;
+      const ghost = new THREE.LineSegments(
+        new THREE.EdgesGeometry(new THREE.BoxGeometry(L, H, 0.01)),
+        new THREE.LineDashedMaterial({ color: 0x8a93a6, dashSize: 0.12, gapSize: 0.08, transparent: true, opacity: 0.7 }));
+      ghost.computeLineDistances();
+      ghost.position.y = H / 2;
+      ghostG.add(ghost);
+      // 1 m 눈금자 (보 앞쪽 바닥)
+      const mat = new THREE.LineBasicMaterial({ color: 0x8a93a6, transparent: true, opacity: 0.8 });
+      const g = new THREE.BufferGeometry(), p = [];
+      const zr = 0.9, yr = -0.62;
+      p.push(-L / 2, yr, zr, L / 2, yr, zr);
+      for (let x = 0; x <= model.L + 1e-9; x += 1) {
+        const big = Math.abs(x % 5) < 1e-9 || Math.abs(x - model.L) < 1e-9;
+        const X = -L / 2 + x * U;
+        p.push(X, yr, zr, X, yr, zr + (big ? 0.22 : 0.1));
       }
+      g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3));
+      ghostG.add(new THREE.LineSegments(g, mat));
     }
-    const interp = (arr, s) => { const t = s * (arr.length - 1), i = Math.min(arr.length - 2, Math.floor(t)), u = t - i; return arr[i] + (arr[i + 1] - arr[i]) * u; };
+
+    /* 처짐 δ(mm)·처짐각 θ(rad)·모멘트 샘플 */
+    let sArr = null, dArr = null, tArr = null, mArr = null, sRef = null;
+    function prepSamples() {
+      const N = 480, L = model.L;
+      sArr = []; dArr = []; mArr = []; tArr = [];
+      for (let i = 0; i <= N; i++) { const x = L * i / N; sArr.push(i / N); dArr.push(model.deflAt(x)); mArr.push(model.Mat(x)); }
+      for (let i = 0; i <= N; i++) {
+        tArr.push(model.slopeAt(L * i / N)); // rad (Hermite 형상함수의 도함수)
+      }
+      // 수평 기준점: 핀(하단 고정) → 없으면 고정단(θ=0) → 없으면 왼쪽 끝
+      const pin = model.sups.find(s => s.type === 'pin') || model.sups.find(s => s.type === 'fixed');
+      sRef = pin ? pin.x / L : 0;
+    }
+    const interp = (arr, s) => { const t = clamp(s, 0, 1) * (arr.length - 1), i = Math.min(arr.length - 2, Math.floor(t)), u = t - i; return arr[i] + (arr[i + 1] - arr[i]) * u; };
+    const scaleNow = () => kCur * f;                       // 현재 표시 배율 × 하중 비율
+    const vDisp = s => interp(dArr, s) / 1000 * U * scaleNow();  // 축의 수직변위 (화면 단위)
+    const phiDisp = s => interp(tArr, s) * scaleNow();           // 화면상 단면 회전각
+    const uShift = () => -(base.H / 2) * phiDisp(sRef);          // 기준점 하단의 수평변위를 0으로
+    const uBottom = s => (base.H / 2) * phiDisp(s) + uShift();   // 하단 섬유(y=−H/2)의 수평변위
 
     function applyDeform() {
       if (!mesh) return;
       const pos = mesh.geometry.attributes.position.array, col = mesh.geometry.attributes.color.array;
-      const n = base.s.length, Mabs = Math.max(1e-12, model.Mabs), hh = base.H / 2;
+      const n = base.s.length, Mabs = Math.max(1e-12, model.Mabs), hh = base.H / 2, L = model.L * U, c = uShift();
       for (let i = 0; i < n; i++) {
-        const s = base.s[i];
-        const d = interp(dArr, s) * dScale * f;
-        pos[3 * i] = -LEN / 2 + s * LEN;
-        pos[3 * i + 1] = base.y[i] + d;
+        const s = base.s[i], y = base.y[i];
+        pos[3 * i] = -L / 2 + s * L - y * phiDisp(s) + c;
+        pos[3 * i + 1] = hh + y + vDisp(s);
         pos[3 * i + 2] = base.z[i];
-        const sig = -interp(mArr, s) * base.y[i] / (Mabs * hh) * f; // + 인장
+        const sig = -interp(mArr, s) * y / (Mabs * hh) * f; // + 인장 (σ = −M·y/I), 하중 비율 f 에 비례
         Viewer3D.stressColor(sig, tmpC);
         col[3 * i] = tmpC.r; col[3 * i + 1] = tmpC.g; col[3 * i + 2] = tmpC.b;
       }
@@ -94,130 +123,170 @@ const Beam3D = (() => {
       placeDeco();
     }
 
-    const X = x => -LEN / 2 + x / model.L * LEN;
+    const X = x => (-model.L / 2 + x) * U;
     let decoItems = [];
+    const supMat = () => new THREE.MeshStandardMaterial({ color: 0x5b6577, roughness: 0.7 });
+
+    function momentArc(color, R, cw) {
+      const g = new THREE.Group(), mat = new THREE.MeshStandardMaterial({ color });
+      const tor = new THREE.Mesh(new THREE.TorusGeometry(R, 0.03, 8, 40, Math.PI * 1.5), mat);
+      tor.rotation.z = Math.PI * 0.25;
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.22, 16), mat);
+      const endA = Math.PI * 0.25 + (cw ? 0 : Math.PI * 1.5);
+      cone.position.set(R * Math.cos(endA), R * Math.sin(endA), 0);
+      cone.rotation.z = endA + (cw ? Math.PI : 0);
+      g.add(tor, cone);
+      return g;
+    }
+
     function buildDeco() {
       Viewer3D.clearGroup(deco);
       decoItems = [];
       const H = base.H;
       const orange = 0xf06a1d, green = 0x2f9e44, violet = 0x7b3fe4;
-      // 지점
+      // 힘 화살표 공통 축척 (kN → 화면 단위): 집중하중과 반력이 같은 축척이라 길이 합이 평형을 그대로 보여 줌
+      const Fmax = Math.max(1e-9, ...model.loads.filter(l => l.type === 'point').map(l => Math.abs(l.P)), ...model.sups.map(s => Math.abs(s.R)));
+      const fs = Math.min(0.06, 2.2 / Fmax);
+      const wmax = Math.max(1e-9, ...model.loads.filter(l => l.type === 'dist').map(l => Math.max(Math.abs(l.w1), Math.abs(l.w2))));
+      const ws = Math.min(0.16, 1.2 / wmax);
+
       model.sups.forEach(s => {
-        const g = new THREE.Group();
-        const mat = new THREE.MeshStandardMaterial({ color: 0x5b6577, roughness: 0.7 });
+        const mat = supMat();
         if (s.type === 'fixed') {
-          const wall = new THREE.Mesh(new THREE.BoxGeometry(0.25, 2.2, 1.6), mat);
-          wall.position.set(s.x < model.L / 2 ? -0.125 : 0.125, 0, 0);
-          g.add(wall);
-        } else {
-          // 삼각기둥: 꼭짓점이 위로 향하게
-          const prism = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.7, 3), mat);
-          prism.rotation.set(-Math.PI / 2, 0, 0);
-          prism.position.y = -H / 2 - 0.28;
-          g.add(prism);
-          if (s.type === 'roller') {
-            [-0.15, 0.15].forEach(dx => {
-              const c = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.7, 16), mat);
-              c.rotation.x = Math.PI / 2; c.position.set(dx, -H / 2 - 0.47, 0);
-              g.add(c);
-            });
+          const g = new THREE.Group();
+          const left = s.x < model.L / 2;
+          const wall = new THREE.Mesh(new THREE.BoxGeometry(0.22, 2.4, 1.4), mat);
+          wall.position.set(left ? -0.11 : 0.11, H / 2, 0);
+          g.add(wall); g.position.x = X(s.x); deco.add(g);
+          if (Math.abs(s.Mr) > 1e-6) {
+            const arc = momentArc(green, 0.5, s.Mr < 0);
+            deco.add(arc);
+            decoItems.push({ obj: arc, kind: 'arc', x: s.x, z: 0.75, H });
           }
-          const pad = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.06, 0.9), mat);
-          pad.position.y = s.type === 'roller' ? -H / 2 - 0.58 : -H / 2 - 0.47;
-          g.add(pad);
+        } else {
+          const tri = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.6, 3), mat);
+          tri.rotation.set(-Math.PI / 2, 0, 0); // 꼭짓점이 위 (보 하단에 닿음)
+          const triG = new THREE.Group(); tri.position.y = -0.26; triG.add(tri);
+          const pinDot = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.66, 12), new THREE.MeshStandardMaterial({ color: 0x2b3240 }));
+          pinDot.rotation.x = Math.PI / 2; triG.add(pinDot);
+          deco.add(triG);
+          const item = { kind: s.type, x: s.x, tri: triG };
+          if (s.type === 'roller') {
+            const wheels = [];
+            [-0.12, 0.12].forEach(dx => {
+              const wg = new THREE.Group();
+              const c = new THREE.Mesh(new THREE.CylinderGeometry(ROLL_R, ROLL_R, 0.6, 20), mat);
+              c.rotation.x = Math.PI / 2; wg.add(c);
+              const mark = new THREE.Mesh(new THREE.BoxGeometry(ROLL_R * 1.9, 0.018, 0.62), new THREE.MeshStandardMaterial({ color: 0xe9ecf2 }));
+              wg.add(mark);
+              deco.add(wg); wheels.push({ g: wg, dx });
+            });
+            const pad = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.05, 0.8), mat);
+            pad.position.set(X(s.x), -0.39 - 2 * ROLL_R - 0.025, 0); deco.add(pad);
+            item.wheels = wheels;
+          } else {
+            const pad = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.05, 0.8), mat);
+            pad.position.set(X(s.x), -0.39 - 0.025, 0); deco.add(pad);
+          }
+          decoItems.push(item);
         }
-        g.position.x = X(s.x);
-        deco.add(g);
-        // 반력 화살표
         if (Math.abs(s.R) > 1e-6) {
-          const len = 0.6 + 0.9 * Math.abs(s.R) / model.Rmax;
-          const a = Viewer3D.arrow(green, len, 0.04);
-          if (s.R > 0) { a.rotation.z = Math.PI; }
+          const len = Math.abs(s.R) * fs;
+          const a = Viewer3D.arrow(green, len, 0.035);
+          if (s.R > 0) a.rotation.z = Math.PI; // 위 방향
           deco.add(a);
-          decoItems.push({ obj: a, x: s.x, kind: 'react', up: s.R > 0, H, len });
+          decoItems.push({ obj: a, kind: 'react', x: s.x, up: s.R > 0, len, fixed: s.type === 'fixed', left: s.x < model.L / 2 });
         }
       });
-      // 하중
-      const wmax = Math.max(1e-9, ...model.loads.filter(l => l.type === 'dist').map(l => Math.max(l.w1, l.w2)));
-      const pmax = Math.max(1e-9, ...model.loads.filter(l => l.type === 'point').map(l => Math.abs(l.P)));
+
       model.loads.forEach(l => {
         if (l.type === 'point') {
-          const len = 0.9 + 0.8 * Math.abs(l.P) / pmax;
-          const a = Viewer3D.arrow(orange, len, 0.05);
+          const len = Math.abs(l.P) * fs;
+          const a = Viewer3D.arrow(orange, len, 0.045);
           if (l.P < 0) a.rotation.z = Math.PI;
           deco.add(a);
-          decoItems.push({ obj: a, x: l.x, kind: 'load', down: l.P >= 0, H, len });
+          decoItems.push({ obj: a, kind: 'load', x: l.x, down: l.P >= 0, len, H });
         } else if (l.type === 'dist') {
-          const n = Math.max(2, Math.round((l.x2 - l.x1) / model.L * 22));
+          const n = Math.max(2, Math.round((l.x2 - l.x1) / 0.5));
           for (let i = 0; i <= n; i++) {
             const x = l.x1 + (l.x2 - l.x1) * i / n;
             const w = l.w1 + (l.w2 - l.w1) * i / n;
-            if (w / wmax < 0.04) continue;
-            const len = 0.25 + 0.85 * w / wmax;
-            const a = Viewer3D.arrow(orange, len, 0.022);
+            if (Math.abs(w) < 1e-9) continue;
+            const len = Math.abs(w) * ws;
+            const a = Viewer3D.arrow(orange, len, 0.02);
+            if (w < 0) a.rotation.z = Math.PI;
             deco.add(a);
-            decoItems.push({ obj: a, x, kind: 'load', down: true, H, len });
+            decoItems.push({ obj: a, kind: 'load', x, down: w >= 0, len, H });
           }
         } else if (l.type === 'moment') {
-          const g = new THREE.Group();
-          const mat = new THREE.MeshStandardMaterial({ color: violet });
-          const tor = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.035, 8, 40, Math.PI * 1.5), mat);
-          tor.rotation.z = -Math.PI * 0.25 * 3 + Math.PI;
-          const cone = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.25, 16), mat);
-          // 끝 화살촉 (시계/반시계)
-          const endA = tor.rotation.z + (l.M >= 0 ? 0 : Math.PI * 1.5);
-          cone.position.set(0.55 * Math.cos(endA), 0.55 * Math.sin(endA), 0);
-          cone.rotation.z = endA + (l.M >= 0 ? Math.PI : 0);
-          g.add(tor, cone);
-          deco.add(g);
-          decoItems.push({ obj: g, x: l.x, kind: 'moment', H });
+          const arc = momentArc(violet, 0.5, l.M >= 0);
+          deco.add(arc);
+          decoItems.push({ obj: arc, kind: 'arc', x: l.x, z: 0.45, H });
         }
       });
     }
 
     function placeDeco() {
+      const L = model.L;
       decoItems.forEach(it => {
-        const s = it.x / model.L, d = interp(dArr, s) * dScale * f;
-        const y0 = d;
+        const s = it.x / L;
         if (it.kind === 'load') {
-          const drop = (1 - easeOut(Math.min(1, f * 1.4))) * 2.2; // 위에서 떨어지는 효과
-          if (it.down) { it.obj.position.set(X(it.x), y0 + it.H / 2 + 0.02 + drop, 0); }
-          else { it.obj.position.set(X(it.x), y0 + it.H / 2 + it.len + 0.02 + drop, 0); }
-          it.obj.visible = f > 0.01;
+          // 보 윗면(변형 후)에 화살촉이 닿게, 길이는 하중 비율 f 에 비례
+          const top = base.H + vDisp(s), xs = X(it.x) - (base.H / 2) * phiDisp(s) + uShift();
+          const k = Math.max(0.001, f);
+          it.obj.scale.set(1, k, 1);
+          it.obj.position.set(xs, it.down ? top + 0.01 : top + 0.01 + it.len * k, 0);
+          it.obj.visible = f > 0.005;
         } else if (it.kind === 'react') {
-          const k = easeOut(f);
-          it.obj.scale.set(1, Math.max(0.01, k), 1);
-          const base = -it.H / 2 - 0.68; // 지점 바로 아래
-          // 위 방향(↑)은 화살촉이 지점에 닿고, 아래 방향(↓)은 지점에서 내려감
-          it.obj.position.set(X(it.x), it.up ? base : base - it.len * k, 0.75);
-        } else if (it.kind === 'moment') {
-          it.obj.position.set(X(it.x), y0, 0.5);
-          it.obj.scale.setScalar(Math.max(0.01, easeOut(f)));
+          const k = Math.max(0.001, f);
+          it.obj.scale.set(1, k, 1);
+          const yb = it.fixed ? 0 : -0.62;
+          const xr = X(it.x) + (it.fixed ? (it.left ? 0.12 : -0.12) : 0);
+          it.obj.position.set(xr, it.up ? yb : yb - it.len * k, it.fixed ? 0.85 : 0.62); // 고정단은 벽 앞쪽에 그림
+          it.obj.visible = f > 0.005;
+        } else if (it.kind === 'arc') {
+          it.obj.position.set(X(it.x), base.H / 2 + vDisp(s), it.z);
+          it.obj.scale.setScalar(Math.max(0.001, f));
+        } else if (it.kind === 'pin') {
+          it.tri.position.set(X(it.x), 0, 0); // 핀은 움직이지 않음 (보가 이 점을 중심으로 회전)
+        } else if (it.kind === 'roller') {
+          const du = uBottom(s); // 보 하단 섬유가 이동한 거리 = 윗판 이동
+          it.tri.position.set(X(it.x) + du, 0, 0);
+          it.wheels.forEach(w => {
+            w.g.position.set(X(it.x) + w.dx + du / 2, -0.39 - ROLL_R, 0); // 미끄럼 없이 구르면 중심은 절반 이동
+            w.g.rotation.z = -(du / 2) / ROLL_R;
+          });
         }
       });
     }
-    const easeOut = t => 1 - Math.pow(1 - t, 3);
+    const easeInOut = t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
 
     v.onTick(now => {
-      if (animStart === null) return;
-      const t = (now - animStart) / 1600;
-      f = easeOut(Math.min(1, Math.max(0, t)));
-      applyDeform();
-      if (t >= 1) animStart = null;
+      let dirty = false;
+      if (animStart !== null) {
+        const t = (now - animStart) / 2200;
+        f = easeInOut(Math.min(1, Math.max(0, t)));
+        if (opt.onLoad) opt.onLoad(f);
+        dirty = true;
+        if (t >= 1) animStart = null;
+      }
+      if (dirty && model) applyDeform();
     });
 
     let lastSig = '';
     return {
       update(m, { animate = false } = {}) {
         model = m;
-        const sig = JSON.stringify([m.sec.type, m.sec.B, m.sec.h]);
+        const sig = JSON.stringify(m.sec);
         if (!mesh || sig !== lastSig) { build(); lastSig = sig; }
+        buildGhost();
         prepSamples();
         buildDeco();
-        if (animate) { f = 0; animStart = performance.now(); }
+        kCur = m.k; // 표시 배율은 화면 라벨과 항상 같게 즉시 적용
+        if (animate) { f = 0; animStart = performance.now(); if (opt.onLoad) opt.onLoad(0); }
         applyDeform();
       },
-      play() { f = 0; animStart = performance.now(); v.start(); },
+      play() { f = 0; animStart = performance.now(); if (opt.onLoad) opt.onLoad(0); v.start(); },
       start: () => v.start(),
       reset: () => v.reset(),
     };
