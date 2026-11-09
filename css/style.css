@@ -390,3 +390,74 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* ---------- 트러스 읽는 법 ---------- */
+.reading.wide { max-width: 1180px; }
+.t-violet { color: var(--violet); }
+.gd-big-rule { background: var(--surface); border: 1px solid var(--border); border-left: 5px solid var(--accent); border-radius: 14px; padding: 16px 20px; box-shadow: var(--shadow); }
+.gd-big-rule p { margin: 4px 0 0; font-size: 16px; line-height: 1.6; }
+.gd-big-label { font-size: 12px; font-weight: 700; color: var(--accent); letter-spacing: .02em; }
+.gd-head { display: flex; gap: 14px; align-items: flex-start; }
+.gd-head h3 { margin: 3px 0 6px; }
+.gd-head p { margin: 0; }
+.gd-num { flex: none; width: 34px; height: 34px; border-radius: 10px; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; font-weight: 700; font-family: var(--font-num); }
+.gd-ctl { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; margin: 16px 0 4px; }
+.gd-ctl .seg { flex: 0 1 auto; }
+.gd-fig { border: 1px solid var(--border); border-radius: 12px; background-color: var(--surface); margin: 10px 0; user-select: none; -webkit-user-select: none; }
+.gd-fig .mb, .gd-fig .jt { cursor: pointer; }
+.gd-fig .jt:hover circle:last-of-type { stroke: var(--accent); }
+.gd-split { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 16px; align-items: start; }
+.gd-figwrap { position: relative; min-width: 0; }
+.gd-figtag { position: absolute; top: 20px; left: 12px; }
+.gd-side { background: var(--surface-2); border-radius: 12px; padding: 14px 16px; font-size: 14px; margin-top: 10px; min-width: 0; }
+.gd-side h4 { margin: 8px 0 4px; }
+.gd-side .eq { font-size: 13.5px; }
+.gd-fbd { width: 100%; max-width: 300px; height: auto; display: block; margin: 4px auto; background: var(--surface); border-radius: 10px; border: 1px solid var(--border); }
+.gd-fbd text { font-family: var(--font-ui); fill: var(--text); }
+.gd-rules { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.gd-card { border: 1px solid var(--border); border-top: 4px solid var(--c); border-radius: 12px; padding: 12px 16px; }
+.gd-card.t { --c: var(--tension); } .gd-card.c { --c: var(--comp); }
+.gd-card h4 { color: var(--c); margin: 0 0 4px; }
+.gd-card p { margin: 0; font-size: 14px; }
+.gd-table td, .gd-table th { font-size: 13.5px; }
+.gd-table { margin: 6px 0 12px; }
+.gd-msg { padding: 10px 12px; border-radius: 10px; background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--accent); margin: 10px 0; font-size: 14px; }
+.gd-msg.ok { border-left-color: var(--ok); }
+.gd-msg.bad { border-left-color: var(--bad); }
+.gd-steps, .gd-lines { margin: 6px 0; padding-left: 20px; }
+.gd-steps li, .gd-lines li { margin: 5px 0; }
+.gd-story { border-left: 4px solid var(--c); padding-left: 12px; margin: 8px 0; }
+.gd-story.t { --c: var(--tension); } .gd-story.c { --c: var(--comp); }
+.gd-story ul { padding-left: 18px; margin: 6px 0; }
+.gd-story li { margin: 6px 0; }
+.gd-progress { display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; font-size: 13px; align-items: center; }
+.gd-progress b { font-family: var(--font-num); }
+.gd-progress .bar { grid-column: 1 / -1; height: 6px; background: var(--border); border-radius: 99px; overflow: hidden; }
+.gd-progress .bar i { display: block; height: 100%; background: var(--ok); transition: width .3s; }
+.gd-dot { display: inline-block; width: 11px; height: 11px; border-radius: 50%; vertical-align: -1px; }
+.gd-dot.ok { background: var(--ok); }
+.gd-checks { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 7px; }
+.gd-checks li { display: flex; gap: 9px; align-items: flex-start; font-size: 13.5px; }
+.gd-checks i { flex: none; width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--border); background: var(--surface); display: grid; place-items: center; font-style: normal; font-size: 12px; font-weight: 800; margin-top: 1px; }
+.gd-checks li.ok i { background: var(--ok); border-color: var(--ok); color: #fff; }
+.gd-checks li.ok i::after { content: '✓'; }
+.gd-checks li.bad i { background: var(--bad); border-color: var(--bad); color: #fff; }
+.gd-checks li.bad i::after { content: '✕'; }
+.gd-pick { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 8px 0; font-size: 13px; }
+.gd-pick > span { color: var(--muted); font-weight: 600; margin-right: 2px; }
+.gd-pick .chip { border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; font-family: var(--font-num); }
+.gd-pick .chip.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.gd-quiz { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 18px; align-items: center; }
+.gd-q { font-size: 15px; font-weight: 600; margin: 0 0 10px; }
+.gd-ans { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.gd-ans .btn { padding: 14px; font-size: 16px; }
+.gd-ans .btn[data-a="T"]:hover:not(:disabled), .gd-ans .btn[data-a="T"].picked { border-color: var(--tension); color: var(--tension); }
+.gd-ans .btn[data-a="C"]:hover:not(:disabled), .gd-ans .btn[data-a="C"].picked { border-color: var(--comp); color: var(--comp); }
+.gd-ans .btn.picked { opacity: 1; border-width: 2px; }
+.gd-quiz-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 14px; }
+.gd-quiz-foot b { font-family: var(--font-num); }
+.shake { animation: shake .4s; }
+@keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+@media (max-width: 1560px) { .gd-split { grid-template-columns: minmax(0, 1fr); } .gd-side { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 4px 20px; align-items: start; } .gd-side > .gd-progress, .gd-side > .gd-msg, .gd-side > .gd-checks, .gd-side > .gd-pick { grid-column: 1 / -1; } }
+@media (max-width: 760px) { .gd-rules, .gd-quiz { grid-template-columns: minmax(0, 1fr); } .gd-figtag { position: static; display: inline-block; margin-top: 6px; } }
+.gd-eqbox { grid-column: 1 / -1; }

@@ -27,6 +27,7 @@
       <div class="nav-group">실습 랩</div>
       <a href="#beam" data-page="beam"><svg viewBox="0 0 24 24"><path d="M3 9h18v4H3zM6 13l-2 5h4zM18 13l-2 5h4zM12 3v5"/></svg><span>보 해석</span><small>SFD·BMD·처짐</small><i class="done-dot"></i></a>
       <a href="#section" data-page="section"><svg viewBox="0 0 24 24"><path d="M5 4h14v3h-5.5v10H19v3H5v-3h5.5V7H5z"/></svg><span>단면과 응력</span><small>I·σ·τ</small><i class="done-dot"></i></a>
+      <a href="#guide" data-page="guide"><svg viewBox="0 0 24 24"><path d="M4 12h5M15 12h5M9 12a3 3 0 1 0 6 0a3 3 0 1 0-6 0M6 9l-3 3 3 3M18 9l3 3-3 3"/></svg><span>트러스 읽는 법</span><small>인장·압축</small><i class="done-dot"></i></a>
       <a href="#truss" data-page="truss"><svg viewBox="0 0 24 24"><path d="M3 18h18M3 18l4.5-9 4.5 9 4.5-9 4.5 9M7.5 9h9"/></svg><span>트러스</span><small>절점법·절단법</small><i class="done-dot"></i></a>
       <a href="#column" data-page="column"><svg viewBox="0 0 24 24"><path d="M12 3v2M9 5h6M12 5c3 5 3 9 0 14M9 19h6M12 19v2"/></svg><span>기둥 좌굴</span><small>오일러</small><i class="done-dot"></i></a>
       <div class="nav-group">확인</div>
@@ -122,6 +123,7 @@
         <div><h4>절점법</h4><p>절점 하나를 떼어 ΣF<sub>x</sub> = 0, ΣF<sub>y</sub> = 0을 씁니다. 식이 2개이므로 <b>미지수 2개 이하인 절점</b>부터 차례로 풉니다. 모든 부재력을 구할 때 씁니다.</p></div>
         <div><h4>절단법</h4><p>부재 3개 이하를 지나도록 잘라 한쪽 덩어리의 ΣF<sub>x</sub>, ΣF<sub>y</sub>, ΣM을 씁니다. 나머지 두 부재가 만나는 점에 대해 모멘트를 잡으면 미지수 하나만 남습니다. <b>특정 부재</b>만 구할 때 빠릅니다.</p></div>
       </div>
+      <div class="note">절점법에서 화살표 방향이 헷갈리거나, 절점 순서·절단 위치를 어떻게 정하는지 궁금하면 <a href="#guide"><b>트러스 읽는 법</b></a>에서 트러스를 조각내 가며 확인해 보세요.</div>
       <div class="truss-check"><b>트러스 정정 판별</b> m + r = 2j 이면 정정 (m: 부재 수, r: 반력 수, j: 절점 수). m + r &gt; 2j 이면 부정정, m + r &lt; 2j 이면 불안정입니다.</div>
     </article>
     <div class="next-row"><a class="btn primary" href="#beam">다음: 보 해석 랩 →</a></div>
@@ -246,6 +248,110 @@
   </div>
 </section>
 
+<!-- ================= GUIDE ================= -->
+<section class="page" id="page-guide">
+  <div class="reading wide">
+    <nav class="toc" aria-label="목차">
+      <a href="#guide" data-jump="g-1">1 부재 하나</a><a href="#guide" data-jump="g-2">2 부재 기준 vs 절점 기준</a><a href="#guide" data-jump="g-3">3 절점으로 나누기</a><a href="#guide" data-jump="g-4">4 절단으로 나누기</a><a href="#guide" data-jump="g-5">5 화살표 퀴즈</a>
+    </nav>
+
+    <div class="gd-big-rule">
+      <div class="gd-big-label">이 페이지의 한 줄 규칙</div>
+      <p>구조물을 잘라 떼어 낸 몸(부재·절점·조각)에서, 자른 면의 화살표가 <b class="t-tension">몸 밖으로 나가면 인장</b>, <b class="t-comp">몸 안으로 들어오면 압축</b>입니다. 부재든 절점이든 절단한 조각이든 똑같습니다.</p>
+    </div>
+
+    <article class="concept" id="g-1">
+      <div class="gd-head"><span class="gd-num">1</span><div>
+        <h3>부재 하나: 당기면 인장, 밀면 압축</h3>
+        <p>트러스 부재는 양 끝이 핀으로 연결된 막대라서 길이 방향 힘만 받습니다. <b>고무줄</b>을 양쪽에서 잡아당기면 늘어나죠? 그게 <b class="t-tension">인장</b>입니다. <b>빨대</b>를 양 끝에서 누르면 줄어들고 휘려고 하죠? 그게 <b class="t-comp">압축</b>입니다.</p>
+      </div></div>
+      <div class="gd-ctl">
+        <div class="seg" id="g1-mode"><button data-v="T" class="active">당기기 (인장)</button><button data-v="C">밀기 (압축)</button></div>
+        <button class="btn sm" id="g1-play" type="button">다시 재생 ▶</button>
+      </div>
+      <svg id="g1-svg" class="fig gd-fig grid-paper" viewBox="0 0 900 330"></svg>
+      <div class="gd-rules">
+        <div class="gd-card t"><h4>인장 (T, +)</h4><p>양 끝을 바깥으로 당김 → 부재가 <b>늘어남</b>. 가운데 어디를 잘라도, 잘린 두 토막이 서로를 <b>끌어당깁니다</b>. 줄다리기 줄, 현수교 케이블이 대표적입니다.</p></div>
+        <div class="gd-card c"><h4>압축 (C, −)</h4><p>양 끝을 안으로 밀어 넣음 → 부재가 <b>줄어듦</b>. 잘린 두 토막이 서로를 <b>밀어냅니다</b>. 기둥, 의자 다리가 대표적이고, 가늘고 길면 옆으로 휘는 <b>좌굴</b>을 조심해야 합니다.</p></div>
+      </div>
+    </article>
+
+    <article class="concept" id="g-2">
+      <div class="gd-head"><span class="gd-num">2</span><div>
+        <h3>가장 헷갈리는 부분: 부재 기준 vs 절점 기준</h3>
+        <p>같은 부재의 같은 힘인데, <b>부재를 떼어 볼 때</b>와 <b>절점을 떼어 볼 때</b> 화살표가 반대로 그려집니다. 절점과 부재를 살짝 떼어 놓고 틈에서 무슨 일이 일어나는지 보세요.</p>
+      </div></div>
+      <div class="gd-ctl">
+        <div class="seg" id="g2-mode"><button data-v="T" class="active">인장 부재</button><button data-v="C">압축 부재</button></div>
+        <div class="seg" id="g2-view"><button data-v="both" class="active">둘 다</button><button data-v="member">부재만</button><button data-v="joint">절점만</button></div>
+        <button class="btn sm" id="g2-play" type="button">붙였다 떼어 놓기 ▶</button>
+      </div>
+      <svg id="g2-svg" class="fig gd-fig grid-paper" viewBox="0 0 900 290"></svg>
+      <div class="tbl-wrap"><table class="tbl gd-table">
+        <tr><th></th><th>부재에 그린 화살표</th><th>절점에 그린 화살표</th><th>기억법</th></tr>
+        <tr><td class="t-tension"><b>인장</b></td><td>부재 끝에서 <b>바깥쪽</b>으로 ←&nbsp;&nbsp;→</td><td>절점에서 <b>나가는</b> 방향 (부재 쪽으로 끌려감)</td><td>줄다리기: 사람(절점)이 줄(부재) 쪽으로 끌려간다</td></tr>
+        <tr><td class="t-comp"><b>압축</b></td><td>부재 끝에서 <b>안쪽</b>으로 →&nbsp;&nbsp;←</td><td>절점으로 <b>들어오는</b> 방향 (부재에 밀려남)</td><td>기둥: 기둥(부재)이 바닥(절점)을 꾹 누른다</td></tr>
+      </table></div>
+      <div class="note"><b>왜 헷갈릴까?</b> 절점 그림에서 인장 화살표는 절점에서 멀어지는 쪽을 가리켜서 "밀어낸다"처럼 보입니다. 하지만 실제로는 <b>부재가 절점을 자기 쪽으로 끌어당기는 힘</b>입니다. 반대로 압축 화살표는 절점을 찌르듯 들어오는데, 이것은 부재가 절점을 <b>밀고 있는</b> 힘입니다. 틈 양쪽의 두 화살표는 크기가 같고 방향이 반대인 <b>작용·반작용</b> 한 쌍입니다. 그래서 어느 쪽을 보든 "몸 밖으로 나가면 인장" 규칙 하나로 읽으면 됩니다.</div>
+    </article>
+
+    <article class="concept" id="g-3">
+      <div class="gd-head"><span class="gd-num">3</span><div>
+        <h3>절점법: 트러스를 절점으로 나누기</h3>
+        <p>절점법은 트러스를 <b>절점마다 동그랗게 오려 내어</b> 하나씩 푸는 방법입니다. 아래 트러스에서 절점을 직접 클릭해 순서대로 풀어 보세요. 절점 옆 숫자는 <b>아직 모르는 부재의 수</b>이고, <span class="gd-dot ok"></span> 초록색이면 지금 풀 수 있는 절점입니다.</p>
+      </div></div>
+      <div class="gd-ctl">
+        <div class="seg"><button data-gtype="pratt">프랫</button><button data-gtype="howe">하우</button><button data-gtype="warren">워렌</button></div>
+        <button class="btn sm primary" id="g3-explode" type="button">절점과 부재 떼어 놓기</button>
+        <button class="btn sm" id="g3-hint" type="button">힌트</button>
+        <button class="btn sm" id="g3-all" type="button">모두 풀기</button>
+        <button class="btn sm" id="g3-reset" type="button">처음부터</button>
+      </div>
+      <div class="gd-split">
+        <div class="gd-figwrap"><span class="tag gd-figtag" id="g3-tag"></span><svg id="g3-svg" class="fig gd-fig grid-paper" viewBox="0 0 1000 420"></svg></div>
+        <aside class="gd-side" id="g3-side"></aside>
+      </div>
+    </article>
+
+    <article class="concept" id="g-4">
+      <div class="gd-head"><span class="gd-num">4</span><div>
+        <h3>절단법: 어디를 어떻게 자를까</h3>
+        <p>절단법은 트러스를 <b>가위로 한 번 잘라 두 조각</b>으로 나누고, 한 조각만 보고 푸는 방법입니다. 부재를 클릭하면 잘리고, 다시 클릭하면 붙습니다. 오른쪽 규칙 세 개가 모두 초록이 되도록 잘라 보세요.</p>
+      </div></div>
+      <div class="gd-ctl">
+        <div class="seg"><button data-gtype="pratt">프랫</button><button data-gtype="howe">하우</button><button data-gtype="warren">워렌</button></div>
+        <button class="btn sm primary" id="g4-preset" type="button">추천 자르기</button>
+        <button class="btn sm" id="g4-bad" type="button">잘못 자른 예</button>
+        <button class="btn sm" id="g4-reveal" type="button">답 보기</button>
+        <button class="btn sm" id="g4-clear" type="button">모두 붙이기</button>
+      </div>
+      <div class="gd-split">
+        <div class="gd-figwrap"><span class="tag gd-figtag" id="g4-tag"></span><svg id="g4-svg" class="fig gd-fig grid-paper" viewBox="0 0 1000 420"></svg></div>
+        <aside class="gd-side" id="g4-side"></aside>
+      </div>
+      <div class="note"><b>자르는 요령</b> ① 구하고 싶은 부재를 지나도록 자릅니다. ② 세로로 한 칸(패널)을 가로지르면 보통 상현재·사재·하현재 3개가 잘립니다. ③ 잘린 부재의 힘은 모두 <b>인장(조각 밖으로)</b>이라고 가정하고, 답이 음수면 압축입니다. ④ 하중이 적은 쪽 조각을 고르면 식이 짧아집니다.</div>
+    </article>
+
+    <article class="concept" id="g-5">
+      <div class="gd-head"><span class="gd-num">5</span><div>
+        <h3>화살표 읽기 퀴즈</h3>
+        <p>그림의 화살표만 보고 인장인지 압축인지 맞혀 보세요. 화살표 색은 힌트가 되지 않도록 보라색으로 그렸습니다.</p>
+      </div></div>
+      <div class="gd-quiz">
+        <svg id="g5-svg" class="fig gd-fig grid-paper" viewBox="0 0 520 270"></svg>
+        <div class="gd-quiz-side">
+          <p class="gd-q" id="g5-q"></p>
+          <div class="gd-ans" id="g5-ans"><button class="btn" data-a="T" type="button">인장</button><button class="btn" data-a="C" type="button">압축</button></div>
+          <div class="gd-msg" id="g5-fb"></div>
+          <div class="gd-quiz-foot"><span>맞힌 수 <b id="g5-score">0 / 0</b></span><button class="btn sm primary" id="g5-next" type="button">다음 문제 ▶</button></div>
+        </div>
+      </div>
+    </article>
+
+    <div class="next-row"><a class="btn primary" href="#truss">다음: 트러스 랩에서 직접 풀기 →</a></div>
+  </div>
+</section>
+
 <!-- ================= TRUSS ================= -->
 <section class="page" id="page-truss">
   <div class="lab">
@@ -267,6 +373,7 @@
           <button class="btn sm" data-tload="center">중앙 한 점</button><button class="btn sm" data-tload="clear">모두 지우기</button>
         </div>
         <p class="hint">그림의 절점을 클릭하면 하중을 놓거나 뺍니다.</p>
+        <p class="hint">화살표 읽는 법이 헷갈리면 <a href="#guide">트러스 읽는 법</a>을 먼저 보세요.</p>
       </div>
       <div class="ctl">
         <h3>표시</h3>
@@ -363,6 +470,7 @@
 <script src="js/beam.js"></script>
 <script src="js/section.js"></script>
 <script src="js/truss.js"></script>
+<script src="js/guide.js"></script>
 <script src="js/column.js"></script>
 <script src="js/quiz.js"></script>
 <script src="js/app.js"></script>
